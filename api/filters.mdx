@@ -1,0 +1,63 @@
+---
+title: Filters
+description: Filter the event stream by action type, asset, address, or asset ID
+---
+
+Filters narrow the event stream to only matching events. All filter dimensions use **AND** logic: if multiple filters are specified, an event must match all of them.
+
+## Filter fields
+
+| Field | Type | Match Logic | Case |
+|-------|------|-------------|------|
+| `action_types` | `string[]` | Exact match on event `type` | Case-sensitive |
+| `addresses` | `string[]` | Match on event `user` field | Case-insensitive (auto-lowercased) |
+| `assets` | `string[]` | Match on event `asset` field | Case-insensitive (auto-uppercased) |
+| `asset_ids` | `number[]` | Match on event `asset_id` field | Exact numeric equality |
+
+## Behavior
+
+- **Omitted filter** = matches everything (no restriction on that dimension)
+- **Empty array** `[]` = matches nothing (blocks all events)
+- **Firehose** = subscribe with no `filters` field at all
+
+## Examples
+
+**All BTC activity:**
+```json
+{"action": "subscribe", "filters": {"assets": ["BTC"]}}
+```
+
+Verified output:
+```json
+{"action":"subscribed","id":"default","sub_id":4,"total_subs":1}
+```
+Then only BTC events arrive:
+```json
+{"block":70874222,"type":"cancelByCloid","asset":"BTC","asset_id":0,...}
+```
+
+**Only cancel events:**
+```json
+{"action": "subscribe", "filters": {"action_types": ["cancel", "cancelByCloid"]}}
+```
+
+**Track a specific address:**
+```json
+{"action": "subscribe", "filters": {"addresses": ["0xd071d6d6ea52f5aa34b79e47f908ee48c8215837"]}}
+```
+
+Verified: all events returned match the subscribed address exactly.
+
+**Combined filter (AND logic) — ETH orders only:**
+```json
+{"action": "subscribe", "filters": {"action_types": ["order"], "assets": ["ETH"]}}
+```
+
+Both conditions must match. An ETH cancel would not be delivered. A BTC order would not be delivered.
+
+**Track by raw asset ID:**
+```json
+{"action": "subscribe", "filters": {"asset_ids": [0]}}
+```
+
+Asset ID 0 = BTC. See [Events](/api/events) for the full asset ID encoding.

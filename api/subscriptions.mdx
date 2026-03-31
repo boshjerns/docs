@@ -1,0 +1,76 @@
+---
+title: Subscriptions
+description: Subscribe, unsubscribe, and manage event streams
+---
+
+All messages are JSON text frames.
+
+## Subscribe
+
+Subscribe to the event stream. Omit `filters` to receive all events (firehose).
+
+**Request:**
+```json
+{
+  "action": "subscribe",
+  "id": "my-subscription",
+  "filters": {
+    "action_types": ["order", "cancel"],
+    "addresses": ["0x1234..."],
+    "assets": ["BTC", "ETH"],
+    "asset_ids": [0, 1]
+  }
+}
+```
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `action` | Yes | Must be `"subscribe"` |
+| `id` | No | Client-chosen identifier. Defaults to `"default"`. Used for unsubscribing. |
+| `filters` | No | Filter object. Omit for firehose. See [Filters](/api/filters). |
+
+**Response:**
+```json
+{
+  "action": "subscribed",
+  "id": "my-subscription",
+  "sub_id": 1,
+  "total_subs": 50000
+}
+```
+
+## Unsubscribe
+
+**Request:**
+```json
+{
+  "action": "unsubscribe",
+  "id": "my-subscription"
+}
+```
+
+**Response:**
+```json
+{
+  "action": "unsubscribed",
+  "id": "my-subscription"
+}
+```
+
+## Multiple subscriptions
+
+You can create multiple subscriptions on a single connection, each with different filters. Each gets its own `sub_id`. Use the `id` field to manage them.
+
+```json
+{"action": "subscribe", "id": "btc-orders", "filters": {"assets": ["BTC"], "action_types": ["order"]}}
+{"action": "subscribe", "id": "whale-tracker", "filters": {"addresses": ["0xd071d6d6..."]}}
+```
+
+Events from all active subscriptions are delivered on the same connection. To stop one stream without disconnecting, unsubscribe by its `id`.
+
+## Error handling
+
+Unknown actions return:
+```json
+{"error": "unknown action"}
+```

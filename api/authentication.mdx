@@ -1,0 +1,41 @@
+---
+title: Authentication
+description: API keys, tiers, and error handling
+---
+
+## API keys
+
+All WebSocket connections require an API key passed as a query parameter:
+
+```
+wss://hyper.polynode.dev/ws?key=pn_live_your_key_here
+```
+
+## Tiers
+
+| Tier | Max Connections | Max Subscriptions |
+|------|----------------|-------------------|
+| free | 1 | 1 |
+| starter | 5 | 50 |
+| growth | 10 | 500 |
+| pro | 150 | 5,000 |
+| enterprise | 500 | 100,000 |
+
+## Error responses
+
+Errors are returned as HTTP responses during the WebSocket handshake.
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 401 | `{"error":"missing API key — use ?key=pn_live_..."}` | No `key` query parameter |
+| 401 | `{"error":"invalid API key"}` | Key not found |
+| 403 | `{"error":"API key is disabled"}` | Key exists but disabled |
+| 429 | `{"error":"connection limit reached for this key"}` | Too many connections for your tier |
+
+## Subscription limits
+
+Exceeding your tier's subscription limit returns an error over the WebSocket:
+
+```json
+{"error": "subscription limit reached for free tier (max 1)"}
+```

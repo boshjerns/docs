@@ -1,0 +1,208 @@
+---
+title: Trading Actions
+description: Order, cancel, modify, and TWAP action formats
+---
+
+## cancel
+
+Cancel orders by order ID. The most common action type on mainnet (~34% of all events).
+
+```json
+{
+  "block": 70873194,
+  "timestamp": 1774938185046,
+  "type": "cancel",
+  "user": "0x034d4f0b00827e4ac77d910071377f707ddd23d3",
+  "asset": "SOL",
+  "asset_id": 5,
+  "data": {
+    "cancels": [
+      {"asset": 5, "oid": 366057443270}
+    ]
+  },
+  "network": "mainnet"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cancels[].asset` | `number` | Asset ID |
+| `cancels[].oid` | `number` | Order ID to cancel |
+
+## cancelByCloid
+
+Cancel orders by client order ID. The single most common action type (~62% of all events).
+
+```json
+{
+  "block": 70873194,
+  "timestamp": 1774938185076,
+  "type": "cancelByCloid",
+  "user": "0xbb475febf78b528f4f0d4ae1a12541406565199c",
+  "asset": "BTC",
+  "asset_id": 0,
+  "data": {
+    "cancels": [
+      {"asset": 0, "cloid": "0x000000000000000018a0b4826b620346"},
+      {"asset": 0, "cloid": "0x000000000000000018a0b4826b620343"}
+    ]
+  },
+  "network": "mainnet"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `cancels[].asset` | `number` | Asset ID |
+| `cancels[].cloid` | `string` | Client order ID (hex) |
+
+## batchModify
+
+Modify multiple existing orders in a single transaction. ~4% of all events.
+
+```json
+{
+  "block": 70873194,
+  "timestamp": 1774938185093,
+  "type": "batchModify",
+  "user": "0x9d428f66b2010000000000010000002fec6c8d80",
+  "asset": "GPT",
+  "asset_id": 110031,
+  "data": {
+    "modifies": [
+      {
+        "oid": "0x19d428d54d6882a00000000000000000",
+        "order": {
+          "asset": 110031,
+          "cloid": "0x19d428d54d6882a00000000000000000",
+          "orderType": {"limit": ["Alo"]},
+          "price": "2.8478",
+          "reduceOnly": false,
+          "side": "buy",
+          "size": "21052.9"
+        }
+      }
+    ]
+  },
+  "network": "mainnet"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `modifies[].oid` | `string` | Original order ID (hex) |
+| `modifies[].order.asset` | `number` | Asset ID |
+| `modifies[].order.side` | `string` | `"buy"` or `"sell"` |
+| `modifies[].order.price` | `string` | New limit price |
+| `modifies[].order.size` | `string` | New size |
+| `modifies[].order.reduceOnly` | `boolean` | Reduce-only flag |
+| `modifies[].order.orderType` | `object` | `{"limit": ["Gtc"]}`, `{"limit": ["Alo"]}`, `{"limit": ["Ioc"]}` |
+| `modifies[].order.cloid` | `string` | Client order ID |
+
+## scheduleCancel
+
+Schedule a future cancel-all. Acts as a dead-man's switch.
+
+```json
+{
+  "block": 70873194,
+  "timestamp": 1774938185546,
+  "type": "scheduleCancel",
+  "user": "0x9d428f84880100000000009f00000000dd684c40",
+  "data": 1774938193082,
+  "network": "mainnet"
+}
+```
+
+The `data` field is a Unix timestamp (milliseconds) at which all of the user's orders will be cancelled.
+
+## order
+
+Place one or more new orders. Rare in the stream because most HFT operations use `batchModify`.
+
+```json
+{
+  "type": "order",
+  "data": {
+    "orders": [
+      {
+        "asset": 0,
+        "side": "buy",
+        "price": "82500.00",
+        "size": "0.01",
+        "reduceOnly": false,
+        "orderType": {"limit": ["Gtc"]},
+        "cloid": "0x..."
+      }
+    ]
+  }
+}
+```
+
+## modify
+
+Modify a single existing order. Same fields as one entry in `batchModify`.
+
+## twapOrder
+
+Place a TWAP (Time-Weighted Average Price) order. Captured live:
+
+```json
+{
+  "block": 70785606,
+  "timestamp": 1774926670264,
+  "type": "twapOrder",
+  "asset": "?",
+  "asset_id": 170000,
+  "data": {
+    "asset": 170000,
+    "isBuy": false,
+    "params": ["2.337", false, 5, true]
+  },
+  "network": "mainnet"
+}
+```
+
+## twapCancel
+
+Cancel a TWAP order.
+
+```json
+{
+  "type": "twapCancel",
+  "data": {
+    "asset": 0,
+    "twapId": 12345
+  }
+}
+```
+
+## updateLeverage
+
+Change leverage for an asset.
+
+```json
+{
+  "type": "updateLeverage",
+  "data": {
+    "asset": 0,
+    "isCross": true,
+    "leverage": 20
+  }
+}
+```
+
+## updateIsolatedMargin
+
+Add or remove margin from an isolated position.
+
+```json
+{
+  "type": "updateIsolatedMargin",
+  "data": {
+    "asset": 0,
+    "isBuy": true,
+    "ntli": 1000
+  }
+}
+```

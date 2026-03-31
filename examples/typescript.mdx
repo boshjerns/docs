@@ -1,0 +1,84 @@
+---
+title: TypeScript
+description: Connect to hypernode with TypeScript
+---
+
+## Install
+
+```bash
+npm install ws
+```
+
+## Firehose (all events)
+
+```typescript
+import WebSocket from "ws";
+
+const API_KEY = "pn_live_your_key_here";
+const ws = new WebSocket(`wss://hyper.polynode.dev/ws?key=${API_KEY}`);
+
+ws.on("open", () => {
+  console.log("Connected to hypernode");
+  ws.send(JSON.stringify({ action: "subscribe" }));
+});
+
+ws.on("message", (raw: Buffer) => {
+  const msg = JSON.parse(raw.toString());
+
+  if (msg.action === "subscribed") {
+    console.log(`Subscribed: sub_id=${msg.sub_id}`);
+    return;
+  }
+
+  console.log(
+    `[${msg.block}] ${msg.type} | ${msg.user?.slice(0, 12) ?? "?"} | ${msg.asset ?? ""}`
+  );
+});
+
+ws.on("close", () => console.log("Disconnected"));
+ws.on("error", (err) => console.error("Error:", err.message));
+```
+
+## Filtered subscription
+
+```typescript
+// Only BTC and ETH cancels
+ws.send(JSON.stringify({
+  action: "subscribe",
+  id: "btc-eth-cancels",
+  filters: {
+    action_types: ["cancel", "cancelByCloid"],
+    assets: ["BTC", "ETH"],
+  },
+}));
+```
+
+## Track a specific address
+
+```typescript
+ws.send(JSON.stringify({
+  action: "subscribe",
+  id: "whale-tracker",
+  filters: {
+    addresses: ["0xd071d6d6ea52f5aa34b79e47f908ee48c8215837"],
+  },
+}));
+```
+
+## Prediction market events (testnet)
+
+```typescript
+const ws = new WebSocket(`wss://hyper-testnet.polynode.dev/ws?key=${API_KEY}`);
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({
+    action: "subscribe",
+    filters: {
+      action_types: [
+        "userOutcome", "splitOutcome", "mergeOutcome",
+        "mergeQuestion", "negateOutcome",
+      ],
+    },
+  }));
+});
+```

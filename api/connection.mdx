@@ -1,0 +1,48 @@
+---
+title: Connection
+description: WebSocket endpoint and network options
+---
+
+## WebSocket endpoint
+
+```
+wss://hyper.polynode.dev/ws?key={api_key}
+```
+
+Pass your API key as a query parameter. Keys are prefixed with `pn_live_`.
+
+## Networks
+
+| Network | Endpoint | Volume | Description |
+|---------|----------|--------|-------------|
+| Mainnet | `wss://hyper.polynode.dev/ws` | ~500-1000 actions/sec | HyperLiquid production chain |
+| Testnet | `wss://hyper-testnet.polynode.dev/ws` | ~30-50 actions/sec | HyperLiquid testnet, HIP-4 active |
+
+## Latency
+
+hypernode delivers committed transactions before HyperLiquid's own public API.
+
+| Coin | Median Advantage | Delivered First |
+|------|-----------------|-----------------|
+| BTC | +313ms | 74% |
+| ETH | +198ms | 68% |
+| SOL | +276ms | 73% |
+| HYPE | +561ms | 91% |
+| **All** | **+333ms** | **77%** |
+
+Less liquid assets show a larger advantage.
+
+## Keep-alive
+
+The server sends WebSocket ping frames every 30 seconds. Your client must respond with pong within 90 seconds or the connection is closed. Most WebSocket libraries handle this automatically.
+
+You can also send application-level pings:
+
+```json
+{"action": "ping"}
+```
+
+Response:
+```json
+{"action": "pong"}
+```

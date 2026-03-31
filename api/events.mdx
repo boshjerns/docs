@@ -1,0 +1,69 @@
+---
+title: Event Format
+description: Structure of every event delivered by hypernode
+---
+
+## Event structure
+
+Every event is a JSON object:
+
+```json
+{
+  "block": 70873194,
+  "timestamp": 1774938185046,
+  "type": "cancel",
+  "user": "0x034d4f0b00827e4ac77d910071377f707ddd23d3",
+  "asset": "SOL",
+  "asset_id": 5,
+  "data": {
+    "cancels": [
+      {"asset": 5, "oid": 366057443270}
+    ]
+  },
+  "network": "mainnet"
+}
+```
+
+## Fields
+
+| Field | Type | Always Present | Description |
+|-------|------|----------------|-------------|
+| `block` | `number` | Yes | HyperLiquid L1 block number |
+| `timestamp` | `number` | Yes | Unix timestamp in milliseconds |
+| `type` | `string` | Yes | Action type (see [Action Types](/actions/overview)) |
+| `data` | `object` | Yes | Action-specific data |
+| `network` | `string` | Yes | `"mainnet"` or `"testnet"` |
+| `user` | `string` | No | Hex address of the user who submitted the action |
+| `asset` | `string` | No | Human-readable asset name (e.g., `"BTC"`, `"SOL"`) |
+| `asset_id` | `number` | No | Numeric asset identifier |
+
+## Coverage
+
+- `user` is present on **100%** of mainnet events, ~98% on testnet
+- `asset` and `asset_id` are present on trading actions but not on account actions like `setReferrer` or `scheduleCancel`
+- **100% asset name coverage** across all market types
+
+## Asset ID encoding
+
+| Range | Type | Example |
+|-------|------|---------|
+| 0-228 | Perpetual futures | 0 = BTC, 1 = ETH, 5 = SOL |
+| 10000-10306 | Spot pairs | 10000 = PURR, 10001 = HFUN, 10009 = TRUMP |
+| 110000-170000+ | Spot margin variants | 110029 = GUP, 150001 = HFUN |
+| 1900000+ | Prediction market outcomes | HIP-4 outcome tokens (testnet only) |
+
+Spot margin variant IDs (110000+, 120000+, 140000+, 150000+, 170000+) represent the same underlying token in different margin modes. hypernode resolves all variants to their base token name automatically.
+
+## Timestamp
+
+The `timestamp` field is Unix milliseconds. To convert:
+
+```typescript
+const date = new Date(event.timestamp);
+// 2026-03-31T03:09:45.046Z
+```
+
+```python
+from datetime import datetime
+dt = datetime.fromtimestamp(event["timestamp"] / 1000)
+```

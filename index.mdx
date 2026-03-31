@@ -1,97 +1,69 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: hypernode
+description: Real-time HyperLiquid L1 transaction stream, by polynode
 ---
 
-## Setting up
+# hypernode
 
-Get your documentation site up and running in minutes.
+Real-time streaming API for every committed transaction on the HyperLiquid blockchain. Delivered via WebSocket within milliseconds of commitment.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={3}>
+  <Card title="+333ms" icon="bolt">
+    Median advantage over HL's public API
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="100%" icon="check">
+    Asset name and user address coverage
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="53" icon="layer-group">
+    Decoded action types including HIP-4
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Latency advantage
 
-Everything you need to create world-class documentation.
+hypernode delivers transaction data before HyperLiquid's own public API.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+| Coin | Median Advantage | Delivered First |
+|------|-----------------|-----------------|
+| BTC | +313ms | 74% |
+| ETH | +198ms | 68% |
+| SOL | +276ms | 73% |
+| HYPE | +561ms | 91% |
+| **All** | **+333ms** | **77%** |
 
-## Need inspiration?
+Less liquid assets show a larger advantage.
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+## What you get
+
+- **Every transaction** on HyperLiquid L1, decoded and enriched
+- **Named JSON fields** for 22 action types (order, cancel, modify, TWAP, prediction markets, transfers, governance)
+- **Full asset resolution** across 229 perps, 288 spot pairs, all margin variants, and prediction outcomes
+- **Filtered subscriptions** by action type, asset, address, or asset ID
+- **HIP-4 prediction markets** with metadata enrichment (question, expiry, underlying, target price)
+- **Mainnet and testnet** on separate endpoints
+
+## Quick start
+
+```typescript
+import WebSocket from "ws";
+
+const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=YOUR_KEY");
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({ action: "subscribe" }));
+});
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  console.log(`[${event.block}] ${event.type} | ${event.user} | ${event.asset}`);
+});
+```
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Connect and start streaming in 2 minutes
+  </Card>
+  <Card title="API Reference" icon="book" href="/api/connection">
+    Full endpoint and protocol documentation
+  </Card>
+</CardGroup>

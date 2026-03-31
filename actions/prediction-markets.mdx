@@ -1,0 +1,142 @@
+---
+title: Prediction Markets (HIP-4)
+description: HIP-4 prediction market actions and metadata enrichment
+---
+
+<Note>
+HIP-4 prediction markets are currently live on **testnet only**. When they launch on mainnet, the same enrichment and action types will be available on the mainnet stream automatically.
+</Note>
+
+## Overview
+
+HyperLiquid's HIP-4 introduces prediction markets to the L1. hypernode captures all prediction market activity in real time, enriched with human-readable metadata.
+
+Prediction markets consist of:
+- **Questions** — A prediction with multiple outcomes (e.g., "Will BTC be above $67,579 on 2026-03-31?")
+- **Outcomes** — Individual tradeable outcome tokens within a question
+- **Price Binaries** — A common type where the prediction is whether an asset exceeds a target price
+
+## User actions (5 types)
+
+### userOutcome
+Place an order on an outcome token. Same format as a regular `order` but for prediction market outcomes.
+
+### splitOutcome
+Split a position into individual outcome tokens.
+
+```json
+{
+  "type": "splitOutcome",
+  "data": {
+    "outcomeAssetId": 1900001,
+    "amount": "100.00",
+    "prediction_outcome_id": 1900001,
+    "prediction_name": "BTC > $67,579",
+    "prediction_description": "class:priceBinary|underlying:BTC|expiry:20260331-0300|targetPrice:67579|period:1d",
+    "prediction_sides": ["Yes", "No"],
+    "prediction_question": "Daily Price Binaries",
+    "prediction_underlying": "BTC",
+    "prediction_expiry": "20260331-0300",
+    "prediction_target_price": 67579.0,
+    "prediction_period": "1d"
+  },
+  "network": "testnet"
+}
+```
+
+### mergeOutcome
+Merge outcome tokens back into the underlying. Same structure as `splitOutcome`.
+
+### mergeQuestion
+Merge all outcome tokens for a question.
+
+```json
+{
+  "type": "mergeQuestion",
+  "data": {
+    "questionId": 42,
+    "amount": "50.00",
+    "prediction_question_id": 42,
+    "prediction_question_name": "Daily Price Binaries",
+    "prediction_question_description": "Will BTC close above the target price?"
+  },
+  "network": "testnet"
+}
+```
+
+### negateOutcome
+Negate (flip) an outcome position. Same structure as `splitOutcome`.
+
+## Metadata enrichment
+
+When a HIP-4 event is streamed, the `data` field is automatically enriched with prediction market metadata. This metadata is fetched from HyperLiquid's API and refreshed every 60 seconds.
+
+### Enrichment fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `prediction_outcome_id` | `number` | Outcome asset ID |
+| `prediction_name` | `string` | Human-readable outcome name |
+| `prediction_description` | `string` | Full description |
+| `prediction_sides` | `string[]` | Trading sides (e.g., `["Yes", "No"]`) |
+| `prediction_question` | `string` | Parent question name |
+| `prediction_underlying` | `string` | Underlying asset (price binaries, e.g., `"BTC"`) |
+| `prediction_expiry` | `string` | Expiry date (e.g., `"20260331-0300"`) |
+| `prediction_target_price` | `number` | Target price (price binaries) |
+| `prediction_period` | `string` | Time period (e.g., `"1d"`) |
+
+Enrichment fields are only present when the outcome/question exists in the metadata cache. New markets created between 60-second refreshes may briefly appear without enrichment.
+
+## Admin actions (8 types)
+
+These are emitted when prediction markets are created, modified, or settled by the protocol:
+
+| Type | Description |
+|------|-------------|
+| `registerQuestion` | Register a new prediction question |
+| `registerOutcome` | Register a new outcome |
+| `registerNamedOutcome` | Register a named outcome |
+| `registerOutcomeToken` | Register an outcome token |
+| `registerTokensAndStandaloneOutcome` | Register tokens and standalone outcome |
+| `settleOutcome` | Settle a prediction market (resolve the outcome) |
+| `changeOutcomeDescription` | Update an outcome's description |
+| `changeQuestionDescription` | Update a question's description |
+
+## Subscribing to prediction markets
+
+**All user prediction market activity:**
+```json
+{
+  "action": "subscribe",
+  "filters": {
+    "action_types": [
+      "userOutcome", "splitOutcome", "mergeOutcome",
+      "mergeQuestion", "negateOutcome"
+    ]
+  }
+}
+```
+
+**Including admin events (market creation/settlement):**
+```json
+{
+  "action": "subscribe",
+  "filters": {
+    "action_types": [
+      "userOutcome", "splitOutcome", "mergeOutcome",
+      "mergeQuestion", "negateOutcome",
+      "registerQuestion", "registerOutcome", "settleOutcome"
+    ]
+  }
+}
+```
+
+**By specific outcome asset ID:**
+```json
+{
+  "action": "subscribe",
+  "filters": {
+    "asset_ids": [1900001]
+  }
+}
+```

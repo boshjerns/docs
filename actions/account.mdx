@@ -1,0 +1,140 @@
+---
+title: Account & Transfer Actions
+description: Transfers, agent approval, governance, and staking action formats
+---
+
+## setReferrer
+
+Set a referral code. Captured live:
+
+```json
+{
+  "block": 70873218,
+  "timestamp": 1774938186661,
+  "type": "setReferrer",
+  "user": "0xa775d1bd91ee2cc4cae6113e5fd9c0c17b355277",
+  "data": "CCXT1",
+  "network": "mainnet"
+}
+```
+
+## agentSetAbstraction
+
+Agent sets account abstraction. Captured live:
+
+```json
+{
+  "block": 70873229,
+  "timestamp": 1774938188168,
+  "type": "agentSetAbstraction",
+  "user": "0x00000000044186110001adbc00000006656631c0",
+  "data": "u",
+  "network": "mainnet"
+}
+```
+
+## approveAgent
+
+Authorize a trading agent (bot) to act on behalf of the user.
+
+```json
+{
+  "type": "approveAgent",
+  "data": {
+    "agentAddress": "0x...",
+    "agentName": "HyperBot",
+    "extraAgentName": null
+  }
+}
+```
+
+## usdSend
+
+Transfer USDC to another address on HyperLiquid.
+
+```json
+{
+  "type": "usdSend",
+  "data": {
+    "destination": "0x...",
+    "amount": "100.00"
+  }
+}
+```
+
+## withdraw3
+
+Withdraw USDC from HyperLiquid to an external chain.
+
+```json
+{
+  "type": "withdraw3",
+  "data": {
+    "amount": "500.00",
+    "destination": "0x..."
+  }
+}
+```
+
+## vaultTransfer
+
+Deposit to or withdraw from a vault.
+
+```json
+{
+  "type": "vaultTransfer",
+  "data": {
+    "vaultAddress": "0x...",
+    "isDeposit": true,
+    "usd": "1000.00"
+  }
+}
+```
+
+## subAccountTransfer
+
+Transfer funds between main account and sub-account.
+
+```json
+{
+  "type": "subAccountTransfer",
+  "data": {
+    "subAccountUser": "0x...",
+    "isDeposit": true,
+    "usd": "500.00"
+  }
+}
+```
+
+## tokenDelegate
+
+Delegate or undelegate HYPE tokens to a validator.
+
+```json
+{
+  "type": "tokenDelegate",
+  "data": {
+    "validator": "0x...",
+    "amount": "1000",
+    "isUndelegate": false
+  }
+}
+```
+
+## govVote
+
+Vote on a governance proposal.
+
+```json
+{
+  "type": "govVote",
+  "data": {
+    "proposalId": 42,
+    "vote": true
+  }
+}
+```
+
+<Note>
+Account and transfer actions like `usdSend`, `withdraw3`, `vaultTransfer`, `tokenDelegate`, and `govVote` are infrequent on mainnet (a few per hour). They are fully formatted with named fields when they do appear.
+</Note>
