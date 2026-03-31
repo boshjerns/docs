@@ -21,7 +21,6 @@ Service status overview.
 {
   "status": "ok",
   "network": "mainnet",
-  "peer": "65.108.233.82",
   "block": 70874222,
   "actions_per_sec": 2344,
   "uptime_seconds": 10502,
@@ -34,7 +33,6 @@ Service status overview.
 |-------|------|-------------|
 | `status` | `string` | Always `"ok"` if service is running |
 | `network` | `string` | `"mainnet"` or `"testnet"` |
-| `peer` | `string` | Connected upstream peer IP |
 | `block` | `number` | Latest block number processed |
 | `actions_per_sec` | `number` | Current throughput |
 | `uptime_seconds` | `number` | Seconds since service start |
@@ -51,16 +49,8 @@ Full metrics in JSON format.
   "network": "mainnet",
   "uptime_seconds": 10502,
   "current_block": 70874222,
-  "current_peer": "65.108.233.82",
-  "frames_total": 102481,
   "actions_total": 24620887,
   "actions_per_sec": 2344,
-  "bytes_received_mb": 8205.73,
-  "decompress_ok": 101624,
-  "decompress_fail": 857,
-  "broadcaster_hit_rate_pct": 100.0,
-  "broadcaster_hits": 24620674,
-  "broadcaster_misses": 213,
   "events_broadcast": 16392548,
   "events_dropped": 8228339,
   "ws_connections": 0,
@@ -73,23 +63,21 @@ Full metrics in JSON format.
 |-------|-------------|
 | `actions_total` | Total actions decoded since startup |
 | `actions_per_sec` | Current action throughput |
-| `broadcaster_hit_rate_pct` | Percentage of actions with identified user address |
 | `events_broadcast` | Events delivered to subscribers |
 | `events_dropped` | Events with no matching subscribers |
 
 ## GET /metrics/prometheus
 
-Prometheus-compatible text format. All metrics prefixed with `hl_gossip_`.
+Prometheus-compatible text format. All metrics prefixed with `hypernode_`.
 
 **Response:**
 ```
-hl_gossip_actions_per_sec 2344
-hl_gossip_actions_total 24621058
-hl_gossip_broadcaster_hit_rate_pct 100.0
-hl_gossip_current_block 70874223
-hl_gossip_uptime_seconds 10502
-hl_gossip_ws_connections 0
-hl_gossip_ws_subscriptions 0
+hypernode_actions_per_sec 2344
+hypernode_actions_total 24621058
+hypernode_current_block 70874223
+hypernode_uptime_seconds 10502
+hypernode_ws_connections 0
+hypernode_ws_subscriptions 0
 ```
 
 **Prometheus scrape config:**
