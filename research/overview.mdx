@@ -1,0 +1,72 @@
+---
+title: "Protocol Research"
+sidebarTitle: "Overview"
+description: "Deep technical research into HyperLiquid's L1 protocol, consensus mechanics, and DeFi infrastructure."
+icon: "microscope"
+---
+
+Independent protocol research published by polynode as part of building real-time data infrastructure for HyperLiquid. This section provides technical reference material for builders, researchers, and traders who want to understand how HyperLiquid works under the hood.
+
+## What's covered
+
+<CardGroup cols={2}>
+  <Card title="Consensus" icon="cubes" href="/research/consensus">
+    HyperBFT consensus model, block production cycle, and finality mechanics.
+  </Card>
+  <Card title="Action Types" icon="list" href="/research/action-types">
+    Complete reference for all 49+ L1 action types with fields and descriptions.
+  </Card>
+  <Card title="HIP-4" icon="scale-balanced" href="/research/hip4">
+    Prediction markets on HyperLiquid. Trading mechanics, settlement, fees, and deployment.
+  </Card>
+  <Card title="Fee Structure" icon="receipt" href="/research/fees">
+    Full fee tiers, VIP levels, staking discounts, builder fees, and deployer revenue.
+  </Card>
+  <Card title="Gas Auctions" icon="gavel" href="/research/gas-auctions">
+    Dutch auction system for asset deployment gas. Priority fee infrastructure.
+  </Card>
+  <Card title="Lending (BOLE)" icon="building-columns" href="/research/lending">
+    Native borrow/lend system with kink-rate interest model and backstop liquidations.
+  </Card>
+  <Card title="Account System" icon="users" href="/research/accounts">
+    DEX abstraction, unified accounts, portfolio margin, and sub-accounts.
+  </Card>
+  <Card title="Order Book" icon="book" href="/research/orderbook">
+    Order types, lifecycle, trigger orders, and the complete cancel/rejection taxonomy.
+  </Card>
+  <Card title="Bridge" icon="bridge" href="/research/bridge">
+    L1 to Ethereum bridge. Deposit flow, withdrawal flow, validator signing.
+  </Card>
+  <Card title="HyperEVM" icon="code" href="/research/evm">
+    EVM integration, precompiles, CoreWriter bridge, and chain 998.
+  </Card>
+  <Card title="Governance" icon="landmark" href="/research/governance">
+    Staking, delegation, validator jailing, proposals, and epoch management.
+  </Card>
+  <Card title="Funding Rates" icon="chart-line" href="/research/funding">
+    Oracle system, mark price calculation, funding rate mechanics.
+  </Card>
+  <Card title="Token Deployment" icon="rocket" href="/research/deployment">
+    HIP-3 deployment pipeline, gas auctions, hyperliquidity seeding, and TWAP engine.
+  </Card>
+</CardGroup>
+
+## Methodology
+
+This research is based on:
+- Live mainnet and testnet protocol observation and API queries
+- Official HyperLiquid documentation where available
+- Community research contributions
+- Analysis of publicly available protocol behavior
+
+<Info>
+  Last updated: April 2026. Based on mainnet protocol behavior as of this date.
+</Info>
+
+<Warning>
+  HyperLiquid has not published a formal protocol specification. This documentation is independently produced and may contain inaccuracies. Always verify against the live protocol before building production systems.
+</Warning>
+
+## Contributing
+
+Found an error or have additional findings? Reach out to us at [josh@quantish.live](mailto:josh@quantish.live).

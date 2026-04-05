@@ -1,0 +1,186 @@
+---
+title: "Gas Auctions"
+sidebarTitle: "Gas Auctions"
+description: "Dutch auction system for asset deployment gas pricing and the upcoming priority fee infrastructure on HyperLiquid."
+icon: "gavel"
+---
+
+HyperLiquid uses a Dutch auction mechanism to price gas for deploying new assets. Three separate auction systems exist within the protocol: perp market deployment, spot pair deployment, and a future priority transaction inclusion auction.
+
+## Dutch Auction Mechanism
+
+All gas auctions on HyperLiquid follow a Dutch auction model. The price starts high and decreases linearly over a fixed duration. The first participant willing to pay the current price wins.
+
+```
+Price
+  |
+  |\ 
+  | \ 
+  |  \
+  |   \
+  |    \
+  |     \  <-- First bidder wins at current price
+  |      \
+  |_______\___________
+  0                   Time
+  Start               End
+```
+
+Key properties:
+
+- **No floor price** -- auctions can decay all the way to zero if no one bids
+- **Automatic restart** -- a new auction begins as soon as the previous one ends
+- **Cycle duration** -- each auction lasts 111,600 seconds (31 hours)
+- **Linear decay** -- price decreases at a constant rate over the duration
+
+The 31-hour cycle is deliberate. Because it is not a multiple of 24, the auction's cheapest window rotates through different times of day across cycles, preventing any single timezone from consistently getting the best prices.
+
+## Perp Deploy Auction
+
+Deploying a new perpetual market requires winning the perp deploy gas auction.
+
+<ParamField path="perpDeployAuctionStatus" type="object">
+  Current state of the perp deployment auction. Query via the `/info` endpoint with `{"type": "perpDeployAuctionStatus"}`.
+</ParamField>
+
+Live parameters (observed April 2026):
+
+| Parameter | Value |
+|-----------|-------|
+| Start price | 1,000 gas |
+| Duration | 31 hours (111,600s) |
+| Decay rate | ~16 gas/hour |
+| Floor price | None (decays to zero) |
+| Denomination | HYPE |
+
+Example API response:
+
+```json
+{
+  "startTimeSeconds": 1775332800,
+  "durationSeconds": 111600,
+  "startGas": "1000.0",
+  "currentGas": "945.47",
+  "endGas": null
+}
+```
+
+At 1,000 HYPE starting price and ~16 gas/hour decay, a deployer waiting 6 hours would pay roughly 904 HYPE. Waiting the full 31 hours approaches zero.
+
+## Spot Pair Deploy Auction
+
+Creating a new spot trading pair has its own separate auction with different pricing.
+
+<ParamField path="spotPairDeployAuctionStatus" type="object">
+  Current state of the spot pair deployment auction. Query via the `/info` endpoint with `{"type": "spotPairDeployAuctionStatus"}`.
+</ParamField>
+
+Live parameters (observed April 2026):
+
+| Parameter | Value |
+|-----------|-------|
+| Start price | 500 gas |
+| Duration | 31 hours (111,600s) |
+| Floor price | None |
+| Denomination | HYPE |
+
+```json
+{
+  "startTimeSeconds": 1775332800,
+  "durationSeconds": 111600,
+  "startGas": "500.0",
+  "currentGas": "500.0",
+  "endGas": null
+}
+```
+
+Spot pair deployment starts at half the cost of perp deployment (500 vs 1,000 HYPE), reflecting the lower complexity of spot pairs compared to perpetual markets with funding, margin, and liquidation infrastructure.
+
+<Note>
+  A `currentGas` equal to `startGas` indicates the auction just restarted or no time has elapsed in the current cycle.
+</Note>
+
+## Priority Transaction Inclusion (GossipPriorityBid)
+
+The protocol includes infrastructure for a third auction type: priority transaction inclusion. This system is not yet active on mainnet but the action type and state structures exist in the protocol.
+
+### Action Structure
+
+```
+GossipPriorityBidAction {
+  slotId: u32       // which priority slot to bid on
+  ip: String        // bidder's node IP
+  maxGas: u64       // maximum gas willing to pay
+}
+```
+
+This action is registered alongside standard user actions (order, cancel, batchModify, etc.), meaning priority bids will be submitted as regular L1 actions when enabled.
+
+### Design Characteristics
+
+- **Multiple slots** -- the `slotId` field indicates multiple priority tiers, not a single fast lane
+- **IP-based** -- the `ip` field suggests latency or location may factor into priority assignment
+- **Gas-denominated** -- bidders specify `maxGas` they are willing to pay, following the same gas denomination as deployment auctions
+
+### State Structures
+
+The protocol maintains dedicated state for priority auctions:
+
+| Structure | Purpose |
+|-----------|---------|
+| `GossipPriorityGasAuction` | Active auction state (multiple slots) |
+| `GossipPriorityParams` | Global auction parameters |
+| `NodeGossipPriorityConfig` | Per-node participation configuration |
+
+### Current Status
+
+<Warning>
+  The priority bid system is not yet active on mainnet. Querying the API for priority auction status currently returns a 422 error. The code and state structures exist in the protocol, but governance has not enabled it.
+</Warning>
+
+When activated, this will function as HyperLiquid's native MEV infrastructure, allowing users to bid for priority transaction ordering without relying on external block builders or searcher infrastructure.
+
+## Deployer Fee Share
+
+Winning a gas auction and deploying a token also determines the deployer's share of trading fees. Observed values:
+
+| Token Type | `deployerTradingFeeShare` |
+|------------|--------------------------|
+| HIP-3 spot tokens | `1.0` (100% of fees to deployer) |
+| HIP-4 prediction market outcomes | `0.0` (0% to deployer) |
+
+This means spot token deployers currently receive all trading fees generated by their tokens, creating a strong economic incentive to deploy and maintain liquid markets.
+
+## Governance Controls
+
+Gas auction parameters are controlled through validator governance:
+
+| Action | Effect |
+|--------|--------|
+| `GasAuctionChange::EnableAndRestart` | Start or restart an auction cycle |
+| `SetGossipPriority::Params` | Configure priority auction parameters |
+| `VoteGlobalAction::DeployGasAuctionChange` | Validator vote on auction changes |
+
+The decay curve is constrained by an internal assertion (`decay <= 1.0`), ensuring the auction price never increases during a cycle.
+
+## Querying Auction Status
+
+Both active auctions can be queried through the HyperLiquid info API:
+
+```python
+import requests
+
+# Perp deploy auction
+resp = requests.post("https://api.hyperliquid.xyz/info", json={
+    "type": "perpDeployAuctionStatus"
+})
+print(resp.json())
+
+# Spot pair deploy auction
+resp = requests.post("https://api.hyperliquid.xyz/info", json={
+    "type": "spotPairDeployAuctionStatus"
+})
+print(resp.json())
+```
+
+The response includes `startTimeSeconds`, `durationSeconds`, `startGas`, `currentGas`, and `endGas` for each auction. Use `currentGas` to determine the current deployment cost.

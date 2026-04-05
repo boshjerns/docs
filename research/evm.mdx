@@ -1,0 +1,110 @@
+---
+title: "HyperEVM"
+sidebarTitle: "HyperEVM"
+description: "HyperEVM integration, precompiles, CoreWriter bridge, and the L1-EVM execution environment."
+icon: "code"
+---
+
+HyperEVM (chain 998/999) is an EVM-compatible execution environment that runs inside the same consensus as HyperLiquid's L1. It shares state with the L1 order book through a bridge mechanism called the CoreWriter.
+
+## Architecture
+
+HyperEVM is not a separate chain. It runs within the same HyperBFT consensus as the L1 order book. Every L1 block can include EVM transactions alongside native L1 actions.
+
+<Note>
+  HyperEVM mainnet uses chain ID **999**. Testnet uses chain ID **998**.
+</Note>
+
+## CoreWriter — L1 to EVM Bridge
+
+The CoreWriter is the mechanism that pushes L1 state changes into the EVM environment.
+
+### How it works
+
+1. L1 actions execute on the native order book
+2. Relevant state changes are captured as CoreWriter events
+3. Events are written into the EVM state within the same block
+4. EVM contracts can read L1 state through precompiled contracts
+
+### CoreWriter Actions
+
+Specific L1 actions can be enabled or disabled for CoreWriter bridging. Each action type has a toggle controlling whether its state changes propagate to the EVM. EVM contracts can subscribe to bridge events to react to L1 state updates.
+
+## Precompiles — Reading L1 State from EVM
+
+HyperEVM includes precompiled contracts that allow EVM smart contracts to read L1 state directly.
+
+### Available Data
+
+Through precompiles, EVM contracts can access:
+
+- Order book state (prices, depth)
+- User positions and balances
+- Asset metadata
+- Spot token information
+- Clearinghouse state
+
+### Precompile Interface
+
+Precompiles accept structured input specifying which L1 data to read and return the result or an error. Each precompile has a dedicated address mapped within the EVM. Refer to HyperLiquid's EVM documentation for current precompile addresses and calling conventions.
+
+<Warning>
+  Precompile availability may vary between mainnet and testnet. Some precompiles are lazily initialized per epoch.
+</Warning>
+
+## EVM Transactions
+
+EVM transactions on HyperLiquid use the `evmRawTx` action type. These are standard Ethereum-format transactions (EIP-1559) submitted through the L1 consensus.
+
+### Transaction Flow
+
+1. User signs an EVM transaction (chain ID 999)
+2. Transaction is submitted as an `evmRawTx` L1 action
+3. L1 consensus orders it alongside other actions
+4. EVM execution happens within the block
+5. Receipts and logs are produced
+
+### Supported Transaction Types
+
+- Legacy transactions
+- EIP-2930 (access list)
+- EIP-1559 (dynamic fee)
+- EIP-4844 (blob)
+- EIP-7702 (authorization list)
+
+## EVM State Management
+
+HyperEVM state is stored alongside the L1 state. When a new node joins the network, it downloads both L1 and EVM state snapshots which must be consistent at the same block height.
+
+## User Actions
+
+| Action | Description |
+|--------|-------------|
+| `evmUserModify` | Modify EVM-specific user settings |
+| `sendToEvmWithData` | Send tokens to EVM with calldata |
+| `finalizeEvmContract` | Finalize a deployed EVM contract |
+
+## Bridge Address
+
+The HyperEVM bridge contract lives at:
+
+```
+0x2222222222222222222222222222222222222222
+```
+
+This contract:
+- Receives HYPE and emits `BridgeDeposit` events
+- Reverts on any other calldata
+- Is the canonical entry point for L1-to-EVM transfers
+
+## USDC on HyperEVM
+
+USDC is bridged to HyperEVM through the `UsdcEvmContract` system:
+
+- `SystemAlignedQuoteSupplyDeltaAction` — mint/burn USDC on EVM
+- `usdc_evm_system_balance` — tracks the system's USDC balance on EVM
+- Supply changes are governed by validator consensus
+
+<Note>
+  EVM transactions are visible in the L1 data stream before they execute on-chain, providing pre-confirmation visibility for monitoring and analytics.
+</Note>

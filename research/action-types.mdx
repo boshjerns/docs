@@ -1,0 +1,266 @@
+---
+title: "Action Types"
+sidebarTitle: "Action Types"
+description: "Complete reference for all 49+ HyperLiquid L1 user action types, governance actions, and system actions."
+icon: "list"
+---
+
+Every interaction with HyperLiquid's L1 is expressed as a typed **action**. Users sign actions that are submitted through the API, batched into blocks by the proposer, and executed during consensus.
+
+This page catalogs all known action types organized by category.
+
+## User actions (49 types)
+
+These are the actions available to regular users and agents.
+
+### Trading
+
+Core order management and position control.
+
+| Action | Description |
+|--------|-------------|
+| `order` | Place a new order (limit, market, or trigger) |
+| `cancel` | Cancel an existing order by order ID |
+| `cancelByCloid` | Cancel an order by client order ID |
+| `modify` | Modify a single existing order |
+| `batchModify` | Batch modify multiple orders in a single action |
+| `scheduleCancel` | Schedule an order cancellation for a future time |
+| `twapOrder` | Place a TWAP (time-weighted average price) order |
+| `twapCancel` | Cancel an active TWAP order |
+| `updateLeverage` | Change leverage for a specific asset |
+| `updateIsolatedMargin` | Update isolated margin allocation |
+| `topUpIsolatedOnlyMargin` | Top up margin for strict isolated-margin positions |
+
+<Note>
+`batchModify` is the most efficient way to update multiple orders. It processes all modifications atomically in a single block action, reducing round trips and avoiding partial fills between updates.
+</Note>
+
+### Account
+
+User account management, transfers, and configuration.
+
+| Action | Description |
+|--------|-------------|
+| `usdSend` | Send USDC to another address on L1 |
+| `sendAsset` | Send any asset (spot tokens, etc.) to another address |
+| `withdraw3` | Withdraw funds from L1 to Ethereum (bridge withdrawal) |
+| `claimRewards` | Claim accumulated staking rewards |
+| `setDisplayName` | Set a display name for the account |
+| `setReferrer` | Set a referral code |
+| `approveAgent` | Approve an agent wallet to trade on behalf of the account |
+| `approveBuilderFee` | Approve a builder fee for a specific application |
+| `startFeeTrial` | Start a fee trial period |
+| `convertToMultiSigUser` | Convert the account to a multi-signature wallet |
+
+### Sub-accounts
+
+Transfer actions between sub-accounts under the same master account.
+
+| Action | Description |
+|--------|-------------|
+| `subAccountTransfer` | Transfer perp margin (USDC) between sub-accounts |
+| `subAccountSpotTransfer` | Transfer spot tokens between sub-accounts |
+
+### DeFi
+
+Lending, DEX abstraction, and portfolio margin configuration.
+
+| Action | Description |
+|--------|-------------|
+| `borrowLend` | Borrow or lend through the native BOLE system |
+| `userDexAbstraction` | Execute a DEX abstraction action (unified swap interface) |
+| `userSetAbstraction` | Configure DEX abstraction preferences |
+| `agentSetAbstraction` | Agent-level DEX abstraction configuration |
+| `userPortfolioMargin` | Configure portfolio margin settings |
+
+### Vaults
+
+Vault creation and management.
+
+| Action | Description |
+|--------|-------------|
+| `createVault` | Create a new vault |
+| `vaultModify` | Modify vault parameters (fees, limits, etc.) |
+| `vaultTransfer` | Deposit to or withdraw from a vault |
+| `vaultDistribute` | Distribute vault rewards to depositors |
+
+### Staking
+
+Token delegation and staking user management.
+
+| Action | Description |
+|--------|-------------|
+| `tokenDelegate` | Delegate tokens to a validator |
+| `linkStakingUser` | Link a staking user identity |
+
+### Governance
+
+On-chain governance participation.
+
+| Action | Description |
+|--------|-------------|
+| `govPropose` | Submit a governance proposal |
+| `govVote` | Vote on an active governance proposal |
+| `voteAppHash` | Vote on an application state hash |
+
+### EVM
+
+HyperEVM (chain 998) interactions from L1.
+
+| Action | Description |
+|--------|-------------|
+| `evmUserModify` | Modify EVM user settings |
+| `sendToEvmWithData` | Send a transaction to HyperEVM with arbitrary calldata |
+| `finalizeEvmContract` | Finalize an EVM contract deployment |
+
+### Deployment (HIP-3)
+
+Permissionless token and market deployment.
+
+| Action | Description |
+|--------|-------------|
+| `spotDeploy` | Deploy a new spot token through the HIP-3 pipeline |
+| `perpDeploy` | Deploy a new perpetual futures market through HIP-3 |
+
+<Note>
+Deploying through HIP-3 requires 500,000 HYPE staked. Deployment also requires winning a gas auction (Dutch auction) for the deployment slot.
+</Note>
+
+### Prediction markets (HIP-4)
+
+Native L1 prediction market actions.
+
+| Action | Description |
+|--------|-------------|
+| `userOutcome` | Prediction market action. Contains one of four sub-actions: `splitOutcome` (deposit collateral to mint YES + NO tokens), `mergeOutcome` (merge YES + NO back to collateral), `mergeQuestion` (merge across a multi-outcome question), or `negateOutcome` (flip position direction) |
+
+### Priority
+
+Priority transaction inclusion (not yet active on mainnet).
+
+| Action | Description |
+|--------|-------------|
+| `gossipPriorityBid` | Bid for priority transaction inclusion in a specific slot |
+
+<Warning>
+The priority bid system is defined in the protocol but not yet active on mainnet. The action type exists and can be submitted, but the auction infrastructure is not currently processing bids.
+</Warning>
+
+### Validator-only
+
+Actions restricted to validators or the system.
+
+| Action | Description |
+|--------|-------------|
+| `validatorL1Vote` | Validator vote on L1 state |
+| `validatorL1Stream` | Validator L1 stream action |
+| `registerValidator` | Register a new validator |
+| `forceIncreaseEpoch` | Force an epoch increase |
+| `liquidate` | Execute a liquidation (can also be triggered by the system) |
+| `reserveRequestWeight` | Reserve request weight allocation |
+
+---
+
+## SetGlobal actions (governance)
+
+These actions are restricted to validators and modify global protocol parameters. They are submitted through the governance process.
+
+### Asset management
+
+| Action | Description |
+|--------|-------------|
+| `registerAsset` / `registerAsset2` | Register a new perpetual futures asset |
+| `setOracle` | Set the oracle source for an asset |
+| `haltTrading` | Halt trading on a specific asset |
+| `setPerpAnnotation` | Set annotation metadata for a perp |
+
+### Fee and margin configuration
+
+| Action | Description |
+|--------|-------------|
+| `setFeeRecipient` | Set the fee recipient address |
+| `setFeeScale` | Configure fee scaling parameters |
+| `insertMarginTable` | Add a new margin table |
+| `setMarginTableIds` | Assign margin tables to assets |
+| `setMarginModes` | Configure available margin modes |
+| `setOpenInterestCaps` | Set open interest caps per asset |
+
+### Funding and growth
+
+| Action | Description |
+|--------|-------------|
+| `setFundingMultipliers` | Set funding rate multipliers |
+| `setFundingInterestRates` | Set funding interest rate parameters |
+| `setGrowthModes` | Configure growth mode parameters |
+
+### Deployer management
+
+| Action | Description |
+|--------|-------------|
+| `setSubDeployers` | Set sub-deployer addresses for HIP-3 |
+| `disableDex` | Disable the DEX for a specific asset |
+
+### HIP-4 governance
+
+<Accordion title="Prediction market governance actions">
+
+| Action | Description |
+|--------|-------------|
+| `registerOutcome` | Register a new outcome market |
+| `registerTokensAndStandaloneOutcome` | Register outcome tokens and a standalone outcome market |
+| `registerNamedOutcome` | Register a named outcome variant |
+| `settleOutcome` | Settle an outcome market (sets final value, auto-settles all positions) |
+| `changeOutcomeDescription` | Modify an outcome market description |
+| `changeQuestionDescription` | Modify a question description |
+
+</Accordion>
+
+### Gas auction governance
+
+<Accordion title="Gas auction governance actions">
+
+| Action | Description |
+|--------|-------------|
+| `GossipPriorityGasAuctionChange::EnableAndRestart` | Enable or restart the priority gas auction system |
+| `SetGossipPriority::Params` | Set global priority auction parameters |
+
+</Accordion>
+
+---
+
+## System actions
+
+These actions are executed internally by the protocol. They cannot be submitted by users.
+
+| Action | Description |
+|--------|-------------|
+| `SystemSpotSendAction` | System-initiated spot token transfer |
+| `SystemSendAssetAction` | System-initiated asset transfer |
+| `SystemUsdClassTransferAction` | System-initiated USDC class transfer |
+| `SystemApproveBuilderFeeAction` | System-level builder fee approval |
+| `SystemAlignedQuoteSupplyDeltaAction` | Aligned quote supply adjustment (related to token economics) |
+| `SystemBoleAction` | BOLE (backstop liquidation engine) system action |
+| `DeployerSendToEvmForFrozenUserAction` | Handle EVM sends for frozen user accounts |
+| `CSignerAction` | Consensus signer action, includes `VoteJail` for validator jailing votes |
+
+<Note>
+The `CSignerAction::VoteJail` action is how validators vote to jail other validators for liveness or performance violations. It requires consensus among multiple validators before taking effect.
+</Note>
+
+---
+
+## Action submission flow
+
+All user actions follow the same lifecycle:
+
+```
+1. User signs the action with their private key
+2. Action is submitted to the API
+3. A non-leader validator receives and forwards it to the current leader
+4. The leader includes it in the next BlockPropose
+5. Validators vote on the block
+6. After two-chain commit, the action is finalized
+7. State changes are applied and distributed
+```
+
+Actions that fail validation (bad signature, insufficient margin, invalid parameters) are rejected before inclusion in a block. Actions that are included but fail execution (e.g., order rejected due to price movement) still consume a block slot but produce no state change beyond the rejection event.

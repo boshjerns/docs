@@ -1,0 +1,169 @@
+---
+title: "Funding Rates"
+sidebarTitle: "Funding Rates"
+description: "Oracle system, mark price calculation, funding rate mechanics, impact USD, per-perp multipliers, and funding distribution."
+icon: "chart-line"
+---
+
+HyperLiquid's funding rate system keeps perpetual contract prices aligned with their underlying spot prices. It combines an on-chain oracle system, configurable mark price calculation, and per-perp funding parameters.
+
+## Oracle system
+
+The oracle layer provides price feeds for all assets on the exchange. Oracles are classified by the `OracleKindMap` into three modes:
+
+| Oracle Kind | Description |
+|-------------|-------------|
+| `Open` | Standard open oracle, accepts external price updates |
+| `Queue` | Queued oracle with batched price delivery |
+| `Round` | Round-based oracle with discrete update windows |
+
+Each block receives multiple price inputs that feed into funding calculations:
+
+```
+mark_px_inputs          -- mark price calculations
+spot_px_inputs          -- spot price feeds
+external_perp_px_inputs -- external perpetual prices (e.g., from Binance)
+oracle_pxs              -- oracle price updates
+```
+
+## Mark price calculation
+
+The mark price is the reference price used for funding rate computation and liquidation triggers. It is derived from a combination of:
+
+1. **Oracle price** -- the external reference price for the underlying asset
+2. **Spot price inputs** -- on-chain spot market prices where available
+3. **External perp prices** -- prices from external perpetual exchanges for cross-referencing
+4. **Order book mid-price** -- the current mid-market price on HyperLiquid
+
+The mark price aims to be resistant to short-term manipulation while remaining responsive to genuine price movements.
+
+## Impact USD
+
+The funding rate calculation uses an **impact USD** parameter that determines the notional size used when sampling the order book for the premium/discount calculation:
+
+```
+impact_usd         -- impact USD for funding calculation
+default_impact_usd -- default impact USD value
+```
+
+A larger `impact_usd` value smooths out the funding rate by sampling deeper into the order book, while a smaller value makes funding more responsive to thin liquidity at the top of book.
+
+<Note>
+Impact USD is conceptually similar to Binance's "Impact Margin Notional" -- it represents the notional value used to calculate the bid/ask impact prices that determine the premium index.
+</Note>
+
+## Funding rate formula
+
+HyperLiquid supports two funding rate formulas:
+
+### Default formula
+
+The standard funding rate is calculated as:
+
+```
+Premium = (Impact Bid Price + Impact Ask Price) / 2 - Oracle Price
+Funding Rate = clamp(Premium / Oracle Price + Interest Rate, -clamp, +clamp)
+```
+
+Where `clamp` limits the maximum funding rate per period to prevent extreme values. On most exchanges with similar mechanisms, the clamp is typically set to 0.05% (5 basis points) per 8-hour interval, though HyperLiquid's specific clamp values are governance-configurable per asset.
+
+**Example calculation:**
+```
+Oracle Price = $100.00
+Impact Bid = $100.08
+Impact Ask = $100.12
+Premium = ($100.08 + $100.12) / 2 - $100.00 = $0.10
+Funding Rate = clamp($0.10 / $100.00 + 0, -0.05%, +0.05%) = 0.10%
+```
+
+In this example, longs would pay shorts 0.10% of their position value at the next funding settlement.
+
+### Binance formula option
+
+HyperLiquid can optionally use the Binance funding formula for specific perps:
+
+```
+use_binance_formula -- flag to enable Binance-style funding calculation
+```
+
+When enabled, the funding rate follows the Binance premium index and funding rate methodology, which uses a time-weighted average premium over the funding interval.
+
+## Per-perp funding parameters
+
+Each perpetual market has individually configurable funding parameters:
+
+### Funding multipliers
+
+```
+perp_to_funding_multiplier -- per-perp funding multiplier
+```
+
+The funding multiplier scales the calculated funding rate for a specific market. A multiplier greater than 1.0 amplifies funding payments, while less than 1.0 dampens them. This allows the protocol to tune funding aggressiveness per market based on liquidity conditions and historical premium behavior.
+
+### Interest rates
+
+```
+perp_to_funding_interest_rate -- per-perp interest rate
+```
+
+The interest rate component represents the baseline rate embedded in funding. For most perps this is close to zero, but it can be configured per-market. This is distinct from the borrow/lend interest rates in the BOLE system, though the two interact:
+
+```
+setFundingInterestRates       -- governance action to set per-asset rates
+assetToFundingInterestRate    -- map of asset -> funding interest rate
+```
+
+### HL-only perps
+
+Some perpetual markets exist only on HyperLiquid without an external reference price:
+
+```
+hl_only_perps -- perps only on HL (no external reference)
+```
+
+For these markets, the funding rate relies entirely on the on-chain oracle and order book premium, since there is no external perp price to cross-reference.
+
+## Funding distribution
+
+Funding payments are distributed between longs and shorts based on the calculated rate. The distribution process is rate-limited by guard mechanisms:
+
+```
+funding_distribute_guard -- rate limiter for distributions
+funding_update_guard     -- rate limiter for rate updates
+funding_err_dur_guard    -- error duration tracking
+```
+
+The execution sequence each interval is:
+
+```
+update_funding_rates -> refresh_hip3 -> apply_bole_liquidations
+```
+
+<Warning>
+Funding rate updates, HIP-3 oracle refreshes, and borrow/lend liquidation checks happen in a fixed sequence. This ordering matters because funding rate changes can affect margin levels, which in turn can trigger liquidations.
+</Warning>
+
+### Distribution guards
+
+The three guards serve distinct purposes:
+
+| Guard | Purpose |
+|-------|---------|
+| `funding_distribute_guard` | Controls how frequently funding payments are settled to user accounts |
+| `funding_update_guard` | Controls how frequently the funding rate itself is recalculated |
+| `funding_err_dur_guard` | Tracks and rate-limits error conditions during funding calculation |
+
+These guards prevent excessive computation per block and ensure funding calculations remain consistent across the validator set.
+
+## Per-block execution data
+
+Each block produces several data outputs relevant to funding:
+
+```
+node_trades              -- executed trades
+node_fills               -- fill events
+node_raw_book_diffs      -- raw order book changes
+hip3_oracle_updates      -- HIP-3 oracle price updates
+```
+
+The `hip3_oracle_updates` field is particularly relevant for HIP-3 deployed tokens that use deployer-managed oracle feeds rather than the protocol's built-in oracle system.

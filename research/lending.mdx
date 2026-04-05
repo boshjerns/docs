@@ -1,0 +1,240 @@
+---
+title: "Lending (BOLE)"
+sidebarTitle: "Lending (BOLE)"
+description: "HyperLiquid's native borrow/lend system with kink-rate interest model, three liquidation modes, and deep integration with portfolio margin."
+icon: "building-columns"
+---
+
+HyperLiquid's borrow/lend system is internally called **BOLE** (BOrrow LEnd). It is a pool-based lending protocol built directly into the L1, not a separate smart contract. BOLE shares state with the perpetual and spot engines, enabling tight integration with portfolio margin, funding rates, and the HyperEVM bridge.
+
+## Architecture
+
+BOLE operates as a top-level component within HyperLiquid's application state, at the same level as perpetual markets and spot orderbooks. This means lending operations settle in the same block as trades, with no cross-contract calls or bridge latency.
+
+Each supported token has its own **reserve pool** with independent interest rates, utilization tracking, and liquidation parameters. Users supply tokens to earn yield or borrow against their collateral.
+
+## Interest Rate Model
+
+BOLE uses a **kink model** (also called a jump-rate model), the same design used by Compound and Aave. The model creates two distinct rate regimes based on pool utilization.
+
+```
+Rate
+  |                    /
+  |                   /  <-- Above kink: steep increase
+  |                  /
+  |                 / <-- Kink point
+  |               /
+  |             /
+  |           /    <-- Below kink: gradual increase
+  |         /
+  |       /
+  |_____/________________________
+  0%                    100%
+           Utilization
+```
+
+### Parameters
+
+| Parameter | Description |
+|-----------|-------------|
+| `kink_utilization` | Target utilization ratio (e.g., 80%) |
+| `kink_rate` | Interest rate at the kink point |
+| `yearly_rate_curve` | Full rate curve definition |
+| `interest_cap` | Global maximum interest rate cap |
+| `risk_free_rate` | Baseline rate determined by validator consensus |
+
+**Below the kink:** Interest rates increase linearly from a base rate to `kink_rate`. This region encourages borrowing while utilization is healthy.
+
+**Above the kink:** Interest rates increase steeply (jump multiplier) to incentivize repayment and additional supply. This protects lenders from liquidity crunches.
+
+### Risk-Free Rate
+
+The baseline risk-free rate is determined through validator consensus:
+
+- Each validator submits their own rate value
+- The **median** of all submitted values becomes the consensus rate
+- Recalculation is rate-limited to prevent manipulation
+
+This rate serves as the floor for all lending yields and feeds directly into perpetual funding rate calculations.
+
+### Rate Types
+
+| Rate | Description |
+|------|-------------|
+| `supplyYearlyRate` | Annual yield for lenders (APY) |
+| `borrowYearlyRate` | Annual cost for borrowers (APR) |
+| `predictedRate` | Forward-looking rate estimate |
+| `dailyAmountOwed` | Per-user daily interest accrual |
+
+## Reserve State
+
+Each token's reserve pool exposes its current state through the API.
+
+<ParamField path="borrowLendReserveState" type="object">
+  Query via the `/info` endpoint with `{"type": "borrowLendReserveState", "token": "<token>"}` for a single token, or `{"type": "allBorrowLendReserveStates"}` for all tokens.
+</ParamField>
+
+Response fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `utilization` | float | Current pool utilization (borrowed / supplied) |
+| `ltv` | float | Pool-level loan-to-value ratio |
+| `totalSupplied` | string | Total tokens supplied to the pool |
+| `totalBorrowed` | string | Total tokens borrowed from the pool |
+| `supplyYearlyRate` | string | Annual supply yield |
+| `borrowYearlyRate` | string | Annual borrow rate |
+| `basis` | string | Price basis |
+| `value` | string | Current value |
+| `mid` | string | Mid-market reference price |
+
+## User State
+
+Per-user borrow/lend positions are tracked individually.
+
+<ParamField path="borrowLendUserState" type="object">
+  Query via the `/info` endpoint with `{"type": "borrowLendUserState", "user": "<address>"}`.
+</ParamField>
+
+Response fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `token` | string | Token identifier |
+| `total` | string | Total position size |
+| `ltv` | float | User's loan-to-value ratio |
+| `dailyAmountOwed` | string | Daily interest owed |
+| `predictedRate` | string | Predicted interest rate |
+| `portfolioMarginEnabled` | bool | Whether portfolio margin is active |
+| `portfolioMarginRatio` | float | Portfolio margin utilization ratio |
+| `tokenToPortfolioBorrowRatio` | object | Per-token borrow ratio under PM |
+| `evmMintedSupply` | string | EVM-side minted supply |
+| `evmEscrows` | object | EVM escrow amounts |
+| `specialStatuses` | array | Account flags |
+
+## Liquidation System
+
+BOLE implements three distinct liquidation modes, each suited to different scenarios.
+
+### Market Liquidation
+
+Immediate market-order liquidation. When a position's LTV exceeds the liquidation threshold, a market order is placed to close the position. This is the fastest liquidation mode but can cause slippage in thin markets.
+
+### Backstop Liquidation
+
+A backstop system operates as a safety net when market liquidations fail or are insufficient. Key components:
+
+| Component | Purpose |
+|-----------|---------|
+| `BackstopLiquidator` | Manages backstop liquidation state |
+| `BackstopLiquidatorMode` | Configurable operating modes |
+| `BackstopLiquidatorParams` | Global backstop parameters |
+| `BackstopLiquidatorTokenParams` | Per-token backstop configuration |
+
+HIP-3 deployed tokens have their own dedicated backstop liquidator with separate parameters, ensuring third-party token liquidations do not impact core markets.
+
+### Partial Liquidation
+
+Reduces a position incrementally rather than closing it entirely. A `partial_liquidation_cooldown` prevents rapid repeated partial liquidations from destabilizing positions.
+
+### TWAP Liquidation Orders
+
+All liquidation modes can execute through TWAP (Time-Weighted Average Price) orders to minimize market impact:
+
+- Liquidation is split into slices executed over time
+- Each slice has a `size_increment` controlling how much is liquidated per window
+- Orders include standard book order properties (timestamp, size, reduce-only)
+- Liquidation processing runs as a periodic background task
+
+This TWAP approach is particularly important for large positions where an immediate market dump would cause excessive slippage and cascading liquidations.
+
+## Integration with Portfolio Margin
+
+BOLE positions are fully integrated with HyperLiquid's portfolio margin system:
+
+- Borrow positions count toward portfolio margin utilization
+- `tokenToPortfolioBorrowRatio` tracks per-token borrow exposure within the portfolio
+- `portfolioMarginRatio` provides the aggregate margin ratio including BOLE positions
+- Portfolio margin users can use supplied tokens as collateral for perpetual positions
+
+This integration means a single account can simultaneously supply tokens for yield, borrow other tokens, and trade perpetuals, all under a unified margin framework.
+
+## EVM Bridge Integration
+
+BOLE positions can be bridged to the HyperEVM (chain 998):
+
+| Field | Description |
+|-------|-------------|
+| `evmMintedSupply` | Total BOLE tokens minted on the EVM side |
+| `dailyAmountOwed` | Daily interest denominated in wei |
+| `evmEscrows` | Escrow amounts held during bridging |
+
+This enables DeFi composability on the EVM side while the lending logic remains on the L1.
+
+## Governance Controls
+
+BOLE pool parameters are controlled through six `SetBole` governance actions:
+
+| Governance Action | Fields | Purpose |
+|-------------------|--------|---------|
+| `SetBole::Reserve` | 9 | Set reserve-level parameters (rate curves, caps, LTV limits) |
+| `SetBole::Adl` | 2 | Configure auto-deleveraging |
+| `SetBole::BackstopLiquidatorTokenParams` | 4 | Per-token backstop liquidator settings |
+| `SetBole::ResetIndex` | 2 | Reset reserve accumulator index for a token |
+| `SetBole::RateLimit` | 7 | Rate limiting for BOLE operations |
+| `SetBole::TestnetAction` | 2 | Testnet-only actions |
+
+Additionally, validators can set reserve accumulators directly via `VoteGlobalAction::SetReserveAccumulator` and configure backstop parameters for HIP-3 tokens separately.
+
+## Account Abstraction
+
+BOLE activation is part of HyperLiquid's unified account system. When a user activates a unified account, their BOLE token positions are migrated automatically. The migration handles multiple source types:
+
+- Sub-account positions
+- DEX positions
+- Spot positions
+
+This ensures users do not need to manually close and reopen lending positions when upgrading their account structure.
+
+## Funding Rate Connection
+
+BOLE interest rates feed directly into perpetual funding rates:
+
+| Parameter | Description |
+|-----------|-------------|
+| `assetToFundingInterestRate` | Per-asset funding interest rate derived from BOLE |
+| `perpAddBaseRate` | Perp add-side base rate |
+| `perpCrossBaseRate` | Perp cross-margin base rate |
+| `spotAddBaseRate` | Spot add-side base rate |
+| `spotCrossBaseRate` | Spot cross-margin base rate |
+
+This creates a unified interest rate framework where lending rates and perpetual funding rates are economically linked, preventing arbitrage between the two systems.
+
+## Querying BOLE State
+
+```python
+import requests
+
+API = "https://api.hyperliquid.xyz/info"
+
+# All reserve states
+resp = requests.post(API, json={"type": "allBorrowLendReserveStates"})
+reserves = resp.json()
+
+for reserve in reserves:
+    print(f"{reserve['token']}: "
+          f"utilization={reserve['utilization']}, "
+          f"supply_apy={reserve['supplyYearlyRate']}, "
+          f"borrow_apr={reserve['borrowYearlyRate']}")
+
+# Single user state
+resp = requests.post(API, json={
+    "type": "borrowLendUserState",
+    "user": "0x..."
+})
+positions = resp.json()
+```
+
+<Warning>
+  BOLE is actively evolving. Reserve parameters, rate curves, and liquidation thresholds can change through governance votes at any time. Always query current state before making assumptions about rates or limits.
+</Warning>

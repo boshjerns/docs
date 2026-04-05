@@ -1,0 +1,171 @@
+---
+title: "Consensus"
+sidebarTitle: "Consensus"
+description: "HyperBFT consensus model based on HotStuff, block production, two-chain commit rule, validator roles, and jailing system."
+icon: "cubes"
+---
+
+HyperLiquid runs a custom BFT consensus protocol called **HyperBFT**, derived from [HotStuff](https://arxiv.org/abs/1803.05069). It achieves sub-second block times with deterministic finality through a two-chain commit rule.
+
+## Block production
+
+HyperLiquid produces blocks approximately every **0.07 seconds** (70ms). Each block is proposed by a single validator selected through proposer rotation.
+
+The block production pipeline:
+
+1. **Transaction submission** -- users submit signed actions through the API
+2. **Forwarding** -- non-leader validators forward transactions to the current leader
+3. **Block proposal** -- the leader batches pending transactions into a `BlockPropose` message and broadcasts it to all validators
+4. **Voting** -- validators verify and vote on the proposed block
+5. **Commitment** -- after two consecutive rounds of quorum votes, the block is committed
+6. **Distribution** -- committed blocks are forwarded to non-validator nodes for state application
+
+<Note>
+Transactions that are not included in a block remain pending for the next proposal cycle. Transactions that expire without being committed are dropped.
+</Note>
+
+## Two-chain commit rule
+
+HyperBFT uses a **two-chain commit rule** derived from HotStuff BFT:
+
+```
+Round N:   Validators vote on Block A --> Quorum Certificate QC(A) formed
+Round N+1: Validators vote on Block B --> Quorum Certificate QC(B) formed
+           --> Block A is now COMMITTED (CertifiedTwoChainCommit)
+```
+
+A block is only finalized after **two consecutive rounds** of quorum votes succeed. This provides:
+
+- **Byzantine fault tolerance** -- the system tolerates up to f Byzantine validators out of 3f+1 total
+- **O(n) communication complexity** -- linear message complexity per round, significantly better than classical PBFT
+- **Deterministic finality** -- once committed, a block cannot be reverted
+- **Fast confirmation** -- two rounds at ~70ms each means finality in roughly 140ms under normal conditions
+
+The `CertifiedTwoChainCommit` is the cryptographic proof that a block has been finalized through this process.
+
+## Consensus message types
+
+The consensus layer uses several message types to coordinate block production:
+
+| Message | Purpose |
+|---------|---------|
+| `BlockPropose` | Leader proposes a new block containing batched transactions |
+| `BlockVote` | Validators vote on a proposed block |
+| `TxVote` | Individual transaction voting (enables partial block acceptance) |
+| `Timeout` | Validator signals that the current round has timed out |
+| `Tc` | Timeout certificate -- proof that enough validators timed out |
+| `Heartbeat` | Liveness signal from a validator |
+| `HeartbeatAck` | Acknowledgment of a heartbeat |
+| `Qc` | Quorum certificate with next proposer designation |
+
+### TxVote
+
+Individual transaction voting is a newer addition to the consensus protocol. It enables several capabilities:
+
+- **Partial block acceptance** -- validators can reject specific transactions while accepting the rest of the block
+- **Priority enforcement** -- validators verify that priority fee bids are honored correctly
+- **Censorship resistance** -- validators can flag transactions that were improperly excluded
+- **Ordering verification** -- ensures transaction ordering matches auction results
+
+## Proposer rotation
+
+Validators take turns proposing blocks in a deterministic rotation. The `Qc` (quorum certificate) message includes a `next_proposer` field that designates which validator proposes the next block, along with a `suspect` field that can flag misbehaving proposers.
+
+Under normal operation, the rotation cycles through the active validator set. If a proposer fails to produce a block within the timeout window, a `Timeout` message triggers a view change and the next validator in rotation takes over.
+
+## Validator roles
+
+<CardGroup cols={2}>
+  <Card title="Leader (proposer)" icon="crown">
+    Receives forwarded transactions, batches them into blocks, and broadcasts proposals. Rotates every round.
+  </Card>
+  <Card title="Voter" icon="check-to-slot">
+    Validates proposed blocks, casts votes, and participates in quorum formation. All validators vote on every block they don't propose.
+  </Card>
+  <Card title="Sentry" icon="shield">
+    Non-validator nodes that connect to validators. Provides DDoS protection for the validator set by proxying connections.
+  </Card>
+  <Card title="Non-validator" icon="satellite-dish">
+    Receives committed blocks and state updates after consensus. Serves read-only data to clients and applications.
+  </Card>
+</CardGroup>
+
+## Heartbeat system
+
+Validators must continuously prove liveness through a heartbeat mechanism. The system tracks several metrics per validator:
+
+```
+since_last_success    -- time since last successful heartbeat
+last_ack_duration     -- round-trip latency of most recent heartbeat
+latency               -- current latency measurement
+latency_ema           -- exponential moving average of latency over time
+```
+
+Heartbeats serve two purposes:
+
+1. **Liveness detection** -- identifying validators that have gone offline or become unresponsive
+2. **Performance monitoring** -- tracking latency trends to enforce quality-of-service standards
+
+<Accordion title="HeartbeatSnapshot fields">
+The consensus layer maintains a snapshot of heartbeat state:
+
+| Field | Description |
+|-------|-------------|
+| `validators_missing_heartbeat` | Validators that have not sent a heartbeat within the expected window |
+| `disconnected_validators` | Validators with broken network connections |
+| `heartbeat_statuses` | Per-validator heartbeat state and latency metrics |
+| `jailed_validators` | Validators currently removed from the active set |
+</Accordion>
+
+## Jailing
+
+Validators that fail to maintain liveness or performance standards are **jailed** -- temporarily removed from the active validator set. Jailed validators cannot propose blocks or participate in voting until they are unjailed.
+
+### Jailing triggers
+
+<Warning>
+Validators can be jailed not only for going offline, but also for sustained high latency. The protocol enforces **performance standards**, not just liveness.
+</Warning>
+
+There are two paths to jailing:
+
+1. **Missing heartbeats** -- a validator that stops sending heartbeat messages will be flagged and eventually jailed
+2. **Latency threshold** -- if a validator's exponential moving average (EMA) latency exceeds the `latency_ema_jail_threshold`, it is jailed for poor performance
+
+### Jailing configuration
+
+```
+HeartbeatJailingConfig {
+  dry_run                        -- test mode (logs but does not jail)
+  latency_ema_jail_threshold     -- EMA latency ceiling before jailing
+}
+```
+
+The `dry_run` mode allows the network to tune jailing parameters without risking validator set instability.
+
+### Jail voting
+
+Validators can also vote to jail other validators through the `VoteJail` action. This requires consensus -- multiple validators must agree before a validator is forcibly jailed. This mechanism provides a social layer of accountability beyond automated heartbeat checks.
+
+### Jail state
+
+The staking module tracks comprehensive jail state:
+
+| Field | Description |
+|-------|-------------|
+| `jailed_signers` | Set of currently jailed validator signing keys |
+| `jail_vote_tracker` | Tracks active jail votes and their progress |
+| `jail_until` | Earliest timestamp when a jailed validator can request unjail |
+| `signer_to_last_manual_unjail_time` | Cooldown tracking for manual unjail requests |
+| `disabled_validators` | Permanently disabled validators (beyond temporary jailing) |
+| `disabled_node_ips` | IP addresses blocked at the application level |
+
+### Unjailing
+
+Jailed validators can request to be unjailed after the `jail_until` timestamp passes. The system tracks the last manual unjail time per signer to prevent rapid jail/unjail cycling.
+
+Validators that are placed in the `disabled_validators` set are permanently removed and cannot unjail through the standard process.
+
+## Validator revenue
+
+Validators earn revenue through block production and transaction processing. The `ValidatorBroadcasterShare` system distributes broadcaster revenue among validators, potentially weighted by their latency performance -- creating an economic incentive to maintain low-latency infrastructure.

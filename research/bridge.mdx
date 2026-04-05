@@ -1,0 +1,156 @@
+---
+title: "Bridge"
+sidebarTitle: "Bridge"
+description: "L1 to Ethereum bridge mechanics. Deposit flow, withdrawal flow, validator set updates, and bridge state management."
+icon: "bridge"
+---
+
+The HyperLiquid bridge handles all asset movement between the L1 and Ethereum mainnet. It is a **validator-voted system**: both deposits and withdrawals require quorum agreement from the active bridge validator set before execution.
+
+## Bridge state
+
+The bridge maintains several state structures to track in-flight operations:
+
+| Field | Purpose |
+|-------|---------|
+| `eth_id_to_deposit_votes` | Maps Ethereum event IDs to deposit vote tallies |
+| `finished_deposits_data` | Completed deposit records |
+| `withdrawal_signatures` | Validator signatures on pending withdrawals |
+| `withdrawal_finalized_votes` | Finalized withdrawal vote tallies |
+| `finished_withdrawal_to_time` | Completed withdrawal timestamps |
+| `validator_set_signatures` | Validator signatures for set updates |
+| `validator_set_finalized_votes` | Finalized validator set update votes |
+
+## Bridge validator set
+
+The bridge validator set is **distinct from the consensus validator set**. It tracks which validators are authorized to sign bridge operations.
+
+```
+BridgeEpoch          -- epoch counter for the bridge validator set
+BridgePower          -- voting power of a bridge validator
+BridgeValidator      -- individual validator in the bridge set
+BridgeValidatorSet   -- the full set of bridge validators
+ValidatorSetSnapshot -- point-in-time snapshot including:
+  stakes             -- validator stake amounts
+  jailed_validators  -- currently jailed validators
+  consensus          -- consensus participation status
+```
+
+The bridge epoch increments whenever the validator set changes, ensuring that operations signed under an old validator set cannot be replayed.
+
+## Ethereum event identification
+
+Every Ethereum event observed by the bridge is identified by an `EthEventId`:
+
+```
+EthEventId:
+  block_number  -- Ethereum block number
+  event_type    -- Deposit, WithdrawalFinalized, ValidatorSetUpdate, etc.
+  event_index   -- index within the block
+  tx_hash       -- Ethereum transaction hash
+```
+
+This uniquely identifies any event on Ethereum that the bridge needs to process.
+
+## Deposit flow
+
+Deposits move assets from Ethereum to HyperLiquid L1. The flow requires validator quorum before crediting the user.
+
+<Steps>
+  <Step title="Ethereum deposit detected">
+    Validators independently observe a deposit event on Ethereum, identified by its `EthEventId`.
+  </Step>
+  <Step title="Validators vote">
+    Each validator submits a `VoteEthDepositAction` referencing the `ethId` of the L1 event. Votes accumulate in `eth_id_to_deposit_votes`.
+  </Step>
+  <Step title="Quorum reached">
+    Once sufficient validators have confirmed the deposit, it becomes a `FinishedDeposit` and is stored in `finished_deposits_data`.
+  </Step>
+  <Step title="User credited">
+    The deposited USDC is credited to the user's HyperLiquid L1 account.
+  </Step>
+</Steps>
+
+If a deposit is determined to be invalid (e.g., the Ethereum transaction reverted or was fraudulent), validators can reject it, resulting in a `DepositInvalidated` event.
+
+<Note>
+Deposits are the only way to move USDC onto HyperLiquid L1. All deposit events must pass validator quorum -- there is no unilateral crediting mechanism.
+</Note>
+
+## Withdrawal flow
+
+Withdrawals move assets from HyperLiquid L1 back to Ethereum. The process includes a time-lock period and requires validator signatures.
+
+<Steps>
+  <Step title="User requests withdrawal">
+    The user submits a `bridgeWithdrawal` action, which emits a `WithdrawalRequested` event and enters `withdrawal_signatures` tracking.
+  </Step>
+  <Step title="Time-lock period">
+    The withdrawal enters a pending state with a `lockedUntilTimestamp`. It cannot be executed until this time passes.
+  </Step>
+  <Step title="Validators sign">
+    Each validator submits a `ValidatorSignWithdrawalAction` containing the `destination` address, `usd` amount, and `nonce`.
+  </Step>
+  <Step title="Finalization votes">
+    Validators vote on the finalized Ethereum transaction via `VoteEthFinalizedWithdrawalAction`, which includes the `ethTxHash` of the L1 settlement transaction.
+  </Step>
+  <Step title="Withdrawal complete">
+    Once quorum is reached, the withdrawal is marked as `WithdrawalFinalized` and recorded in `finished_withdrawal_to_time`. Funds arrive on Ethereum.
+  </Step>
+</Steps>
+
+### Pending withdrawal state
+
+Each pending withdrawal tracks:
+
+```
+PendingWithdrawals:
+  amount               -- USDC amount
+  validator            -- assigned validator
+  lockedUntilTimestamp -- time-lock before execution
+  token / tokenId      -- token being withdrawn
+```
+
+## Validator set updates
+
+When the HyperLiquid validator set changes, the bridge must update its Ethereum-side validator set to keep bridge operations secure. This is a multi-step process with its own quorum requirement.
+
+<Steps>
+  <Step title="Update proposed">
+    A `ValidatorSetUpdateAction` is created with the new validator set. It includes an associated `EthEventId` and signature in `(r, s, v)` Legacy format.
+  </Step>
+  <Step title="Validators sign">
+    Each validator submits a `SignValidatorSetUpdateAction` containing their signature over the new set. Signatures accumulate in `validator_set_signatures`.
+  </Step>
+  <Step title="Finalization">
+    Once quorum is reached via `validator_set_finalized_votes`, a `VoteEthFinalizedValidatorSetUpdateAction` confirms the update is committed on Ethereum.
+  </Step>
+</Steps>
+
+Related event types:
+
+| Event | Description |
+|-------|-------------|
+| `ValidatorSetUpdate` | The update event itself |
+| `ValidatorSetUpdateEvent` | Event wrapper for indexing |
+| `WithdrawalFinalizedValidatorSetUpdate` | Combined finalization variant |
+
+## USDC EVM contract
+
+The bridge manages a USDC contract on the HyperLiquid EVM side:
+
+```
+UsdcEvmContract                 -- the USDC contract on HyperLiquid EVM
+usdc_evm_system_balance         -- system balance of USDC in the EVM bridge
+initial_usdc_evm_system_balance -- starting balance at genesis
+```
+
+## L1 transfers
+
+Internal L1 transfers between HyperLiquid accounts can be toggled via a feature flag:
+
+```
+l1_transfers_enabled -- feature flag controlling L1 transfers
+```
+
+This flag can be modified through governance, appearing alongside `disabled_core_writer_actions` in the protocol state.

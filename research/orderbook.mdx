@@ -1,0 +1,159 @@
+---
+title: "Order Book"
+sidebarTitle: "Order Book"
+description: "Order types, time-in-force modes, trigger orders, order relationships, and the complete cancel/rejection taxonomy on HyperLiquid."
+icon: "book"
+---
+
+Complete reference for HyperLiquid's order book mechanics, covering order structure, all supported order types, trigger orders (TP/SL), order relationships, and every known cancel and rejection reason.
+
+## Order Types
+
+HyperLiquid supports the following order types:
+
+| Order Type | Description |
+|------------|-------------|
+| `Limit` | Standard limit order at a specified price |
+| `Market` | Executes immediately at the best available price |
+| `StopMarket` | Triggers a market order when the trigger price is hit |
+| `StopLimit` | Triggers a limit order when the trigger price is hit |
+| `TakeProfitLimit` | Triggers a limit order at take-profit price |
+
+<Note>
+Two additional internal order types exist: `CloseForVaultWithdrawal` (used when vaults process withdrawals) and `SpotDustConversion` (converts small residual spot balances).
+</Note>
+
+## Time-in-Force
+
+Every order carries a time-in-force (TIF) setting that determines its lifecycle:
+
+| TIF | Name | Behavior |
+|-----|------|----------|
+| `Gtc` | Good Till Cancel | Rests on the book until filled or cancelled |
+| `Ioc` | Immediate or Cancel | Fills what it can immediately, cancels the rest |
+| `Alo` | Add Liquidity Only | Post-only. Rejected if it would cross the spread and take liquidity |
+| `FrontendMarket` | Frontend Market | Market order variant used by the frontend UI |
+
+## BookOrder Structure
+
+Each resting order on the book contains:
+
+```
+BookOrder {
+  timestamp       — order creation time
+  sz              — size (quantity)
+  reduce_only     — reduce-only flag
+  relationships   — parent/sibling/child order links
+  cloid           — client order ID
+  builder         — builder attribution
+  description     — order description
+}
+```
+
+`OrderCore` holds the shared core fields (price, side, asset) that are common across all order types.
+
+## Trigger Orders (TP/SL)
+
+Trigger orders sit in a separate `untriggered_orders` pool until their trigger condition is met.
+
+```
+TriggerOrder {
+  triggerPx       — trigger price threshold
+  isTrigger       — identifies this as a trigger order
+  isPositionTpsl  — whether this is a TP/SL attached to a position
+  origSz          — original size before any partial fills
+  triggered       — whether the trigger has fired
+}
+```
+
+When the mark price crosses `triggerPx`, the trigger fires and the order enters the active book as its underlying type (market or limit).
+
+Position-level TP/SL orders (`isPositionTpsl: true`) are tied to the position itself rather than being standalone orders. They automatically cancel if the position is closed by other means.
+
+## Order Relationships
+
+Orders can be linked through parent, sibling, and child relationships via the `relationships` field on `BookOrder`.
+
+| Relationship | Description |
+|-------------|-------------|
+| **Parent** | The originating order that spawned this one |
+| **Sibling** | Linked orders where filling one cancels the other (OCO) |
+| **Child** | Orders spawned by a parent (e.g., TP/SL attached to a limit fill) |
+
+### One-Cancels-Other (OCO)
+
+Sibling relationships implement OCO behavior. When one sibling order fills, all other siblings are automatically cancelled with reason `siblingFilledCanceled`.
+
+A common pattern: a take-profit limit and a stop-loss market order are placed as siblings. Whichever triggers first cancels the other.
+
+## Cancel and Rejection Taxonomy
+
+HyperLiquid distinguishes between **cancellations** (order was on the book and removed) and **rejections** (order never made it onto the book).
+
+### User-Initiated Cancellations
+
+| Reason | Description |
+|--------|-------------|
+| `marginCanceled` | Insufficient margin to maintain the order |
+| `scheduledCancel` | A scheduled cancellation was triggered |
+| `internalCancel` | Internal system cancel |
+
+### System-Enforced Cancellations
+
+| Reason | Description |
+|--------|-------------|
+| `perpMaxPositionCanceled` | Order would exceed maximum position size |
+| `vaultWithdrawalCanceled` | Cancelled due to vault withdrawal processing |
+| `openInterestCapCanceled` | Open interest cap for the asset was reached |
+| `selfTradeCanceled` | Self-trade prevention triggered |
+| `reduceOnlyCanceled` | Reduce-only constraint violated (position already closed or flipped) |
+| `siblingFilledCanceled` | A sibling order filled, triggering OCO cancellation |
+| `liquidatedCanceled` | The position was liquidated, cancelling all related orders |
+| `outcomeSettledCanceled` | HIP-4 prediction market outcome settled |
+
+### Order Rejections
+
+| Reason | Description |
+|--------|-------------|
+| `tickRejected` | Price is not on a valid tick increment |
+| `minTradeNtlRejected` | Order is below the minimum notional value |
+| `perpMarginRejected` | Insufficient margin to place the perp order |
+| `perpMaxPositionRejected` | Order would exceed the maximum position size |
+| `reduceOnlyRejected` | Reduce-only order is invalid (no position to reduce) |
+| `iocCancelRejected` | IOC order could not be filled at all |
+| `badTriggerPxRejected` | Trigger price is invalid for the current market state |
+| `marketOrderNoLiquidityRejected` | No liquidity available to fill the market order |
+| `positionIncreaseAtOpenInterestCapRejected` | OI cap prevents position increase |
+| `positionFlipAtOpenInterestCapRejected` | OI cap prevents position flip |
+| `tooAggressiveAtOpenInterestCapRejected` | Order too aggressive near OI cap |
+| `openInterestIncreaseRejected` | General OI increase rejected |
+| `insufficientSpotBalanceRejected` | Not enough spot balance for the order |
+| `oracleRejected` | Oracle price check failed |
+| `outcomeSettledRejected` | Prediction market outcome already settled |
+
+## Order Book State
+
+The exchange maintains order book state within each perp DEX:
+
+```
+perp_dexs[]:
+  books                 — order books per asset
+  funding_tracker       — funding rate tracking
+  user_balances         — per-user balance state
+  book_order_keys       — index of active orders
+  untriggered_orders    — trigger orders waiting for price conditions
+
+spot_books              — separate order books for spot trading
+allowed_liquidators     — addresses authorized to liquidate
+```
+
+Each block produces execution data including:
+
+| Output | Description |
+|--------|-------------|
+| `node_trades` | Executed trades |
+| `node_fills` | Fill events |
+| `node_raw_book_diffs` | Raw order book changes |
+| `node_order_statuses` | Order status updates |
+
+These outputs are available through the streaming API for real-time order book reconstruction.

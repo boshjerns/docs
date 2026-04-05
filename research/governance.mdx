@@ -1,0 +1,252 @@
+---
+title: "Governance"
+sidebarTitle: "Governance"
+description: "Staking, delegation, validator jailing, governance proposals, epoch management, reward distribution, and stake discount tiers."
+icon: "landmark"
+---
+
+HyperLiquid has an on-chain governance system with proposals, voting, and global parameter changes. Governance operates through the staking and validator system, with all state stored directly on L1.
+
+## Proposal system
+
+Governance proposals follow a propose-then-vote pattern:
+
+```
+GovProposeAction:
+  multiSigUser  -- the proposer (multi-sig user)
+  outerSigner   -- the signing identity
+  action        -- the proposed action
+
+GovVoteAction:
+  id      -- proposal ID
+  choice  -- vote choice
+  nonce   -- replay protection
+```
+
+Each proposal has a `ProposalCategory` that determines its scope and quorum requirements. Active proposals are stored in the staking state's `proposals` field.
+
+## Staking state
+
+The staking state is the central governance container. It holds all validator, delegation, and governance data:
+
+| Field | Purpose |
+|-------|---------|
+| `proposals` | Active governance proposals |
+| `stakes` | Validator stake amounts |
+| `jailed_signers` | Currently jailed validator signers |
+| `jail_vote_tracker` | Tracks jailing votes per validator |
+| `jail_until` | Jail expiry timestamps |
+| `native_token_reserve` | HYPE token reserve for rewards |
+| `validator_to_staged_rewards` | Pending rewards per validator |
+| `pending_withdrawals` | Pending stake withdrawals |
+| `self_delegation_requirement` | Minimum self-delegation |
+| `disabled_validators` | Disabled validator set |
+| `validator_to_state` | Per-validator state map |
+| `version` | State version |
+
+Each validator also carries per-validator state:
+
+```
+profile              -- validator profile/metadata
+initial_wei          -- initial stake amount
+disable_delegations  -- flag to disable incoming delegations
+```
+
+## Vote mechanics
+
+HyperLiquid uses a generic **VoteTracker** system for stake-weighted voting across all governance decisions:
+
+```
+VoteTracker:
+  stakes                    -- stake-weighted votes
+  validator_to_value        -- each validator's current vote
+  median_value              -- current median of votes
+  update_median_bucket_guard -- timing for median recalculation
+  num, denom, decay         -- decay parameters for vote weighting
+```
+
+Voting power is determined by `VoteWeight`, which maps directly to staked amounts. This same tracker mechanism is used for governance proposals, parameter changes, jailing votes, and app hash consensus.
+
+### App hash consensus
+
+Validators also vote on application state hashes to ensure all nodes agree on the current state:
+
+```
+AppHashVoteTracker        -- tracks app hash agreement
+quorum_app_hashes         -- confirmed quorum app hashes
+highest_quorum_height     -- highest block with quorum agreement
+quorum_app_hash_mismatch  -- detected mismatches (fresh, stale, missing, incorrect)
+```
+
+## Global parameter changes
+
+Validators can modify global protocol parameters through two mechanisms:
+
+### SetGlobalAction
+
+Direct parameter updates, typically for price feeds:
+
+```
+SetGlobalAction:
+  pxs              -- price data
+  externalPerpPxs  -- external perp prices
+  usdtUsdcPx       -- USDT/USDC price
+```
+
+SetGlobal actions can be delayed (`delayed` flag) for safety, executing at a future block height.
+
+### VoteGlobalAction
+
+Stake-weighted voting on protocol changes. Categories include:
+
+| Category | Description |
+|----------|-------------|
+| `VaultModification` | Vault parameter changes |
+| `GossipPriorityGasAuctionChange` | Gas auction configuration |
+| `SetUsdcEvmContract` | USDC EVM contract address |
+| `RegisterAssetRequest` | New asset registration |
+| `SetHip3BackstopLiquidatorParams` | Backstop liquidator config |
+| `DeployGasAuctionChange` | Deployment gas auction lifecycle |
+| `SetReserveAccumulator` | Lending reserve accumulator |
+
+## Validator registration and management
+
+New validators register via `RegisterValidatorAction`. Once registered, validators can perform various operations through `ValidatorAction`, including scheduling cancellations, setting display names, and voting on global parameters.
+
+Validators can be disabled for specific order types:
+
+```
+ValidatorDisabled variants:
+  Alo              -- disabled for add-liquidity-only orders
+  Ioc              -- disabled for immediate-or-cancel
+  Gtc              -- disabled for good-till-cancel
+  FrontendMarket   -- disabled for frontend market orders
+  LiquidationMarket -- disabled for liquidation market orders
+```
+
+## Jailing system
+
+Validators are jailed for misbehavior, primarily missed heartbeats or consensus failures.
+
+### Jailing flow
+
+<Steps>
+  <Step title="Misbehavior detected">
+    A validator misses heartbeats or disconnects from the network. The `HeartbeatJailingConfig` defines the thresholds.
+  </Step>
+  <Step title="Votes accumulate">
+    Other validators vote to jail the offending validator. Votes accumulate in `jail_vote_tracker`.
+  </Step>
+  <Step title="Threshold reached">
+    Once `jail_threshold` is reached (sufficient stake-weighted votes), the validator is jailed until the `jail_until` timestamp.
+  </Step>
+  <Step title="Unjailing">
+    After the jail period expires, the validator can self-unjail via the `unjailSelf` action. The `signer_to_last_manual_unjail_time` field prevents rapid re-unjailing.
+  </Step>
+</Steps>
+
+### Jailing state
+
+```
+jailed_signers                     -- set of jailed validator signers
+jail_vote_tracker                  -- votes to jail each validator
+jail_until                         -- expiry time per jail
+jail_threshold                     -- stake threshold to trigger jailing
+signer_to_last_manual_unjail_time  -- cooldown after manual unjail
+
+HeartbeatJailingConfig             -- heartbeat-based jailing parameters
+heartbeat_tracker                  -- tracks heartbeat status
+validators_missing_heartbeat       -- validators that missed heartbeats
+disconnected_validators            -- validators that disconnected
+```
+
+<Warning>
+Jailing includes a latency EMA (exponential moving average) component. Validators with consistently high latency can be jailed even if they are technically producing heartbeats, as the system tracks response quality, not just liveness.
+</Warning>
+
+## Delegation system
+
+Token holders can delegate stake to validators. Delegation uses an epoch-based system where changes take effect at epoch boundaries.
+
+### Delegation state
+
+```
+Delegation:
+  initialUsd  -- initial delegation amount in USD
+
+EpochDelegation:
+  effective          -- effective delegation for current epoch
+  target             -- target delegation (pending changes)
+  validator_to_stake -- per-validator stake map
+```
+
+### Validator delegation config
+
+Each validator controls their delegation parameters:
+
+| Field | Purpose |
+|-------|---------|
+| `cold_user` | Cold wallet for delegation |
+| `commission_bps` | Commission in basis points |
+| `delegations_blocked` | Flag to block new delegations |
+| `delegations_disabled` | Flag to fully disable delegations |
+| `register_time` | When the validator registered |
+| `last_signer_change_time` | Last signer key rotation |
+| `disable_delegations` | Per-validator delegation toggle |
+
+Global delegation tracking:
+
+```
+user_to_delegations              -- maps users to their delegations
+total_delegated                  -- total delegated across all validators
+delegator_to_epoch_delegation    -- per-delegator epoch tracking
+```
+
+## Reward distribution
+
+Rewards are distributed from the native HYPE token reserve using a two-phase process:
+
+<Steps>
+  <Step title="Staging">
+    Rewards are accumulated into `validator_to_staged_rewards`. The `stage_reward_bucket_guard` controls timing of this phase.
+  </Step>
+  <Step title="Distribution">
+    Staged rewards are distributed to validators and their delegators. The `distribute_reward_bucket_guard` controls timing.
+  </Step>
+</Steps>
+
+```
+native_token_reserve            -- HYPE token reserve for rewards
+validator_to_staged_rewards     -- pending rewards per validator
+stage_reward_bucket_guard       -- rate limiter for staging
+distribute_reward_bucket_guard  -- rate limiter for distribution
+```
+
+Rewards come from the `native_token_reserve`, which is the protocol's HYPE allocation for validator incentives.
+
+## Stake discount tiers
+
+Staking provides trading fee discounts based on tier thresholds:
+
+```
+StakeDiscountTiers:
+  stake_discount_tiers        -- tier definitions (stake amount -> discount %)
+  weigh_spot_volume_double    -- spot volume weighting factor
+  aligned_quote_token_config  -- per-token configuration
+```
+
+Higher stake amounts unlock progressively better fee discounts. The `weigh_spot_volume_double` field gives additional weight to spot trading volume when calculating tier eligibility.
+
+## Delayed actions
+
+Governance actions can be delayed for safety. This provides a window for validators to review and potentially cancel dangerous parameter changes before they take effect.
+
+```
+delayed_actions             -- queue of delayed actions
+user_to_n_delayed_actions   -- per-user count
+n_total_delayed_actions     -- global count
+max_n_delayed_actions       -- maximum allowed
+delayedUntil                -- block height at which action executes
+ActionDelayerStatus         -- current delayer status
+delay_scale                 -- scaling factor for delays
+```

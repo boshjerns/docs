@@ -1,0 +1,410 @@
+---
+title: "Token Deployment"
+sidebarTitle: "Token Deployment"
+description: "HIP-3 permissionless token deployment pipeline. SpotDeploy sub-actions, genesis distribution, hyperliquidity seeding, gas auctions, sub-deployers, growth modes, and TWAP engine."
+icon: "rocket"
+---
+
+HIP-3 is HyperLiquid's permissionless token listing system. It covers spot token registration, hyperliquidity seeding, perp deployment, and the Dutch auction gas fee mechanism. This page documents the full deployment pipeline and the TWAP engine used for large order execution.
+
+## SpotDeploy sub-actions
+
+The `spotDeploy` action is a top-level action containing 13 sub-actions that cover the entire token deployment lifecycle:
+
+| Index | Sub-action | Purpose |
+|-------|-----------|---------|
+| 0 | `registerToken` | Register a new token for spot trading |
+| 1 | `registerToken2` | V2 registration with additional parameters |
+| 2 | `userGenesis` | Set initial token distribution for users |
+| 3 | `genesis` | Finalize token genesis (locks supply) |
+| 4 | `registerSpot` | Create a spot trading pair (token/quote) |
+| 5 | `registerHyperliquidity` | Seed HLP orders for the pair |
+| 6 | `requestEvmContract` | Request EVM contract linkage for the token |
+| 7 | `setFullName` | Set the token's full display name |
+| 8 | `setDeployerTradingFeeShare` | Configure deployer's cut of trading fees |
+| 9 | `enableFreezePrivilege` | Enable deployer's ability to freeze users |
+| 10 | `freezeUser` | Freeze a specific user's token balance |
+| 11 | `revokeFreezePrivilege` | Permanently revoke freeze capability |
+| 12 | `enableAlignedQuoteToken` | Enable token as aligned quote token |
+
+<Note>
+Token registration requires winning a gas auction first. See the gas auction section below.
+</Note>
+
+## TokenInfo struct
+
+Each deployed token carries comprehensive metadata:
+
+```
+TokenInfo (12+ fields):
+  spots                       -- list of spot pair IDs for this token
+  deploy_time                 -- timestamp of token deployment
+  deploy_gas_wei              -- gas paid for deployment (in wei)
+  evm_contract                -- linked EVM contract address (if any)
+  full_name                   -- human-readable token name
+  seeded_usdc                 -- USDC seeded into hyperliquidity
+  non_circulating_users       -- addresses excluded from circulating supply
+  deployer_trading_fee_share  -- deployer's share of trading fees
+  frozen_users                -- set of frozen user addresses
+  szDecimals                  -- size decimal precision
+  weiDecimals                 -- wei decimal precision
+```
+
+Additional abbreviated fields track deployer permissions, growth modes, and market parameters.
+
+## Genesis distribution
+
+Token genesis controls the initial token distribution:
+
+```
+TokenGenesis:
+  userAndWei          -- list of (address, amount) for user allocations
+  existingTokenAndWei -- existing token balances to honor
+  blacklistUsers      -- addresses to exclude from distribution
+  maxSupply           -- total supply cap
+```
+
+The genesis process is two-step:
+
+1. **`userGenesis`** -- set the distribution list with per-address allocations
+2. **`genesis`** -- finalize and lock the supply, making the token live
+
+Once `genesis` is called, the supply is locked and cannot be modified.
+
+## Hyperliquidity seeding
+
+After registering a spot pair, deployers seed initial liquidity through `registerHyperliquidity`:
+
+```
+registerHyperliquidity:
+  tokens              -- token pair
+  startPx             -- initial price for seeded orders
+  orderSz             -- size per seeded order
+  nOrders             -- number of orders to place
+  nSeededLevels       -- number of price levels to seed
+  address             -- HLP vault address
+  evmExtraWeiDecimals -- extra precision for EVM amounts
+```
+
+The `startPx` sets the initial market price. `nOrders` and `nSeededLevels` control the depth of the initial order book -- more orders at more levels provides tighter spreads and deeper liquidity for early traders.
+
+### HLP ensure-orders system
+
+After initial seeding, the HLP system (`hyperliquidity_ensure_orders`) maintains ongoing liquidity:
+
+```
+spot_to_range                -- price range per spot pair
+ensure_order_bucket_guard    -- rate limiter for order placement
+order_ntl                    -- target notional per order
+max_px                       -- maximum price for seeded orders
+ema                          -- exponential moving average tracker
+system_address               -- HLP system address
+```
+
+The ensure-orders system continuously monitors and replaces filled HLP orders to maintain book depth around the current price.
+
+## Gas auctions
+
+All deployments require winning a Dutch auction for gas. Three separate auctions exist:
+
+| Auction | Purpose |
+|---------|---------|
+| `register_token_gas_auction` | New token registration |
+| `perp_deploy_gas_auction` | Perpetual market deployment |
+| `spot_pair_deploy_gas_auction` | Spot pair creation |
+
+### Dutch auction mechanics
+
+Each auction follows a declining price curve:
+
+```
+GasAuction:
+  bucket_guard   -- rate limiter
+  start_gas_wei  -- starting (highest) gas price
+  end_gas_wei    -- ending (lowest) gas price (null = no floor)
+  + decay parameters (decay_duration, n_samples)
+```
+
+The gas price starts high and decays over time. Deployers can execute at any point by paying the current gas price. The decay is constrained by `assertion: decay <= 1.0`, ensuring the price only decreases.
+
+### Auction parameters
+
+Auction status is queryable via the API:
+
+```
+GasAuctionDetails:
+  startTimeSeconds  -- Unix timestamp when auction started
+  durationSeconds   -- total auction duration (typically 111,600s = 31 hours)
+  startGas          -- starting gas price (e.g., "1000.0" for perps)
+  currentGas        -- current gas price (decaying)
+  endGas            -- floor price (null = decays to zero)
+```
+
+<Tip>
+Perp deployment auctions typically start at 1,000 HYPE and spot pair auctions at 500 HYPE. With a 31-hour duration and no floor, patient deployers can get significantly cheaper gas by waiting.
+</Tip>
+
+### Auction lifecycle
+
+Validators control auction lifecycle through voting:
+
+```
+GasAuctionChange:
+  EnableAndRestart -- start or restart an auction
+
+VoteGlobalAction::DeployGasAuctionChange -- validator vote on auction changes
+```
+
+## Token schema
+
+The full token schema (`Hip3Schema`) defines the market configuration:
+
+```
+Hip3Schema (9 fields):
+  full_name                           -- display name string
+  oracle_updater                      -- oracle price feed address
+  fee_recipient                       -- trading fee recipient address
+  override_fee_recipient              -- optional override for fee routing
+  asset_to_oi_cap                     -- per-asset open interest caps
+  sub_deployers                       -- list of authorized sub-deployer addresses
+  deployer_fee_scale                  -- fee multiplier for deployer share
+  last_deployer_fee_scale_change_time -- timestamp of last fee scale change
+  + state (Na | UserDisabled | ValidatorDisabled)
+```
+
+### Trading limits
+
+Each deployed token has configurable trading limits:
+
+```
+Hip3Limits:
+  last_settlement_time                  -- last settlement timestamp
+  disabled_state                        -- Na | UserDisabled | ValidatorDisabled
+  total_oi_cap                          -- total open interest cap
+  oi_sz_cap_per_perp                    -- per-perp OI size cap
+  max_transfer_ntl                      -- max notional per transfer
+  daily_px_range                        -- allowed daily price range
+  max_n_users_with_positions            -- max concurrent users with positions
+```
+
+## Sub-deployer system
+
+Deployers can authorize sub-deployers with granular permissions:
+
+```
+Hip3SetSubDeployerInput:
+  variant  -- which sub-deployer action
+  allowed  -- what operations are permitted
+```
+
+Sub-deployer operations:
+
+| Operation | Description |
+|-----------|-------------|
+| `setMarginModes` | Change margin mode (cross/isolated) |
+| `setFeeScale` | Adjust fee scaling |
+| `setGrowthModes` | Set growth mode parameters |
+| `disableDex` | Disable DEX trading |
+| `setPerpAnnotation` | Set perp market annotations/metadata |
+
+<Warning>
+A deployer cannot set themselves as a sub-deployer, and duplicate sub-deployers are rejected. Sub-deployers are limited to the operations explicitly granted in their permission set.
+</Warning>
+
+### Deployer restrictions
+
+Several validation rules constrain deployer behavior:
+
+- Growth mode cannot be set when deployer fee scale exceeds 1
+- Growth mode can be blocked by validators
+- Deployer cannot have a staking link
+- Deployer cannot have more than $1M volume traded
+- Deployer must have sufficient stake
+
+## Growth modes
+
+Growth modes control how a newly deployed market scales up:
+
+```
+Hip3GrowthMode          -- enum controlling market scaling
+Hip3CrossMarginTradingMode:
+  half_life             -- decay half-life
+  max_slippage          -- maximum allowed slippage
+```
+
+### Backstop liquidation
+
+Thin or new markets use a backstop liquidator to ensure positions can always be liquidated:
+
+```
+Hip3BackstopLiquidatorParams (3 fields):
+  Configures backstop behavior for thin markets
+
+Hip3BackstopLiquidatorMode:
+  Controls whether backstop liquidation is active
+```
+
+Validators can vote on backstop parameters via `VoteGlobalAction::SetHip3BackstopLiquidatorParams` and allow growth modes via `ValidatorL1VoteAction::AllowHip3GrowthMode`.
+
+## Perp deployment
+
+Perpetual markets are deployed separately via `perpDeploy`:
+
+```
+perpDeploy:
+  asset           -- asset index
+  dex             -- DEX identifier
+  schema          -- Hip3Schema
+  oraclePxs       -- oracle price feeds
+  markPxs         -- mark price configuration
+  externalPerpPxs -- external perp price feeds
+  marginTable     -- margin tier configuration
+  feeRecipient    -- fee destination
+  subDeployers    -- authorized sub-deployers
+  scale           -- fee scale
+  displayName     -- market display name
+```
+
+Deployers can manage perps through `SetGlobalAction` with variant indices covering operations like `registerAsset`, `setOracle`, `haltTrading`, `insertMarginTable`, `setFeeRecipient`, `setOpenInterestCaps`, `setFundingMultipliers`, and `setFundingInterestRates`.
+
+## EVM integration
+
+Tokens can be linked to EVM contracts for cross-layer functionality:
+
+- **`requestEvmContract`** -- request contract linkage during deploy
+- **`FinalizeEvmContractAction`** -- finalize the contract binding
+- **`evmExtraWeiDecimals`** -- additional precision for EVM-side amounts
+- **`AlignedQuoteSupplyDelta`** -- mint/burn aligned quote token supply (restricted to linked EVM contract)
+- Deployers can send tokens to EVM for frozen users via `DeployerSendToEvmForFrozenUserAction`
+
+## Deployer fee share
+
+Deployers earn a configurable share of trading fees on their markets:
+
+```
+DeployerTradingFeeShare:
+  Configurable via setDeployerTradingFeeShare
+  deployer_fee_scale -- fee multiplier
+  last_deployer_fee_scale_change_time -- timestamp of last change
+```
+
+<Note>
+Growth mode cannot be set when `deployer_fee_scale` is greater than 1. This prevents deployers from simultaneously extracting outsized fees and manipulating growth parameters.
+</Note>
+
+## Token registry
+
+The `SpotClearinghouse` maintains the global token registry:
+
+| Field | Purpose |
+|-------|---------|
+| `spot_infos` | Metadata per spot pair |
+| `token_infos` | Metadata per token |
+| `token_id_to_token` | Token ID mapping |
+| `canonical_tokens2` | Canonical token list |
+| `token_to_approx_usdc_px` | Approximate USDC prices |
+| `liquid_base_tokens` | Tokens with sufficient liquidity |
+| `liquid_quote_tokens` | Liquid quote token set |
+| `quote_token_to_status` | Status: enabled, blocked, noCross, strictIsolated |
+
+## TWAP engine
+
+HyperLiquid includes a native TWAP (Time-Weighted Average Price) engine for splitting large trades into smaller slices executed over time.
+
+### TWAP order format
+
+```
+TwapWireSerde (6 fields):
+  a  -- asset (perp/spot coin index)
+  b  -- is_buy (bool)
+  m  -- minutes (total duration, max 1,440 = 24 hours)
+  t  -- total_sz (total order size)
+  s  -- max_slippage (max allowed slippage per slice)
+  r  -- reduce_only (bool)
+```
+
+### TWAP state
+
+Each active TWAP order maintains live state:
+
+```
+TwapState:
+  twap_id         -- monotonic ID (from global counter)
+  next_slice_time -- timestamp of next scheduled slice
+  executed_sz     -- cumulative size filled
+  executed_ntl    -- cumulative notional filled
+  slice_number    -- current slice index (0-based)
+  running_heap    -- position in the scheduler's priority queue
+```
+
+### Execution schedule
+
+```
+TwapSchedule (7 fields):
+  Total duration, number of slices, slice timing
+  size_increment per slice
+  randomize flag -- jitters slice timing to reduce predictability
+```
+
+The `randomize` flag adds timing jitter to make TWAP execution less predictable to front-runners.
+
+### Slice execution
+
+Each slice produces a `TwapSlice` -- a market order placed into the book:
+
+```
+TwapSlice:
+  resting_sz  -- size resting after partial fill
+  orig_sz     -- original slice size
+  tif         -- time-in-force (IOC for slices)
+  BookOrder   -- standard book order
+```
+
+Slice sizes can be dynamically adjusted via `TwapSliceWindowUpdate` based on market conditions.
+
+### Scheduler
+
+Active TWAP slices are managed in a min-heap (`TwapHeapKey`) ordered by `next_slice_time`, allowing efficient O(log n) scheduling of the next slice across all active TWAP orders.
+
+Two separate trackers exist in the clearinghouse:
+
+- `twap_tracker` -- perp TWAP orders
+- `spot_twap_tracker` -- spot TWAP orders
+
+### Constraints and validation
+
+| Rule | Detail |
+|------|--------|
+| Maximum duration | 1,440 minutes (24 hours) |
+| Order value limits | Min and max value bounds enforced |
+| Max active orders | Per-user limit on concurrent TWAP orders |
+| Reduce-only check | Reduce-only TWAP cannot increase position |
+| Account restrictions | Cannot disable unified account or modify portfolio margin with active TWAP orders |
+
+### Cancellation
+
+TWAP orders can be cancelled via `TwapCancelAction`:
+
+```
+TwapCancelAction:
+  a       -- asset
+  twap_id -- the TWAP order to cancel
+
+TwapCancelStatus:
+  success -- cancellation succeeded
+  status  -- OrderStatus (filled, totalSz, avgPx, activated, terminated)
+```
+
+### Query endpoints
+
+Deployment-related data is available through several API endpoints:
+
+| Endpoint | Returns |
+|----------|---------|
+| `SpotDeployState` | Full deploy state for a user |
+| `SpotPairDeployAuctionStatus` | Current spot pair auction |
+| `PerpDeployAuctionStatus` | Current perp auction |
+| `SpotClearinghouseState` | Full spot clearinghouse |
+| `AllPerpMetas` | All perp metadata |
+| `PerpAnnotation` | Per-perp annotations |
+| `PerpCategories` | Perp categorization |

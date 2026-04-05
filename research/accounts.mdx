@@ -1,0 +1,253 @@
+---
+title: "Account System"
+sidebarTitle: "Account System"
+description: "Three-tier account architecture on HyperLiquid: standard accounts, DEX abstraction, and unified portfolio margin."
+icon: "users"
+---
+
+HyperLiquid implements a progressive account abstraction system with three tiers. Each tier adds more unified margin and cross-asset capabilities, from fully isolated per-DEX accounts up to full portfolio margining across perps, spot, and borrow/lend.
+
+## Three-Tier Architecture
+
+### Tier 1: Standard (Default)
+
+Every new account starts in standard mode. Each perpetual DEX operates with its own isolated clearinghouse state. There is no cross-margin between DEXes.
+
+Key characteristics:
+- Each DEX has independent margin, positions, and balances
+- Sub-accounts can be created for further isolation
+- Margin mode per position: **cross** (shared collateral pool within a single DEX) or **isolated** (dedicated margin per position)
+
+### Tier 2: DEX Abstraction
+
+DEX abstraction unifies multiple perp DEX clearinghouse states under a single account view, enabling cross-DEX margin sharing.
+
+<Info>
+DEX abstraction is activated via `activateDexAbstraction`. Agents can also activate it on behalf of users through `AgentEnableDexAbstractionAction`.
+</Info>
+
+When abstraction is enabled, the account exposes:
+
+| Field | Description |
+|-------|-------------|
+| `dexAbstractionEnabled` | Boolean flag indicating abstraction is active |
+| `abstraction` | Metadata including description and display name |
+| `perpDexStates` | Array of per-DEX statuses |
+| `dexToClearinghouseState` | Full clearinghouse state mapped per DEX index |
+
+#### Cross-DEX Transfers
+
+Transfers between DEXes use explicit routing with source and destination parameters:
+
+```
+sourceDex                — Origin DEX index
+destinationDex           — Target DEX index
+sourceDexOrSpot          — Union type: DEX index or spot
+destinationDexOrSpot     — Union type: DEX index or spot
+```
+
+The `DexOrSpot` union type allows transfers to route between perp DEXes and the spot book within the same operation.
+
+#### DEX Management (Governance)
+
+Governance actions available per DEX:
+
+| Action | Description |
+|--------|-------------|
+| `disableDex` | Disable a DEX entirely |
+| `setMarginTableIds` | Assign margin tables to DEXes |
+| `setOpenInterestCaps` | Per-DEX open interest limits |
+| `setFundingMultipliers` | Per-DEX funding rate multipliers |
+| `setMarginModes` | Per-DEX margin mode configuration |
+| `setFeeScale` | Fee structure per DEX |
+| `setGrowthModes` | Growth/listing mode per DEX |
+
+### Tier 3: Unified Account / Portfolio Margin
+
+Full portfolio margining across perps, spot, and borrow/lend. Enables cross-collateralization with non-USDC tokens.
+
+Portfolio margin is enabled via `UserPortfolioMarginAction` with an `enabled` boolean field.
+
+Key fields under portfolio margin:
+
+| Field | Description |
+|-------|-------------|
+| `portfolioMarginEnabled` | Account-level boolean |
+| `portfolioMarginRatio` | Current utilization (0.0 = no risk, 1.0 = liquidation) |
+| `tokenToPortfolioBorrowRatio` | Per-token borrow contribution to margin |
+| `evmEscrows` | EVM-side locked collateral contributing to margin |
+
+Under portfolio margin, multiple tokens can serve as collateral simultaneously. Borrow/lend positions count toward portfolio margin calculations.
+
+## Unified Account Activation
+
+<Warning>
+`ActivateUnifiedAccount` is a **one-way** operation. Once activated, it cannot be reversed.
+</Warning>
+
+The `ActivateUnifiedAccount` action consolidates positions across DEXes and enables portfolio margin:
+
+```
+ActivateUnifiedAccount:
+  fromSubAccount         — Optional: migrate from a sub-account
+  sourceDexOrSpot        — Source for fund consolidation
+  destinationDexOrSpot   — Destination for fund consolidation
+  AllBoleTokens          — Also handles borrow/lend token migration
+```
+
+## Account State Structure
+
+The clearinghouse state response reveals the full layered structure:
+
+```
+clearinghouseState              — Standard perp state (single DEX)
+spotState                       — Spot token balances
+dexToClearinghouseState         — Map of DEX index → clearinghouse state
+abstraction                     — Abstraction metadata
+isAligned                       — Whether collateral matches DEX quote token
+portfolioMarginEnabled          — Portfolio margin active
+evmEscrows                      — EVM-locked collateral
+portfolioMarginRatio            — Current PM utilization ratio
+tokenToPortfolioBorrowRatio     — Per-token borrow ratios under PM
+specialStatuses                 — Account-level flags (e.g., liquidation state)
+```
+
+### Margin Summaries
+
+Two margin summaries are always computed:
+
+- **`marginSummary`** -- Traditional per-DEX margin calculation (`accountValue`, `totalNtlPos`, `totalRawUsd`, `totalMarginUsed`)
+- **`crossMarginSummary`** -- Cross-margin calculation spanning all positions under abstraction
+- **`crossMaintenanceMarginUsed`** -- Maintenance margin across cross-margined positions
+- **`withdrawable`** -- Available for withdrawal after all margin requirements
+
+## Margin Tables
+
+Each DEX references a `MarginTable` that defines its risk parameters:
+
+```
+MarginTable:
+  marginTiers                       — Tiered margin requirements by position size
+  marginTableId                     — Unique identifier
+  collateralToken                   — The collateral token for this table
+  collateralIsAlignedQuoteToken     — Whether collateral is the aligned quote
+  collateralTokenName               — Human-readable collateral name
+  MarginMode                        — Current margin mode
+  maxLeverage                       — Maximum allowed leverage
+  onlyIsolated                      — If true, only isolated margin allowed
+  isDelisted                        — Whether the DEX is delisted
+  growthMode                        — Listing/growth phase
+  lastGrowthModeChangeTime          — Timestamp of last mode change
+  szDecimals                        — Size decimal precision
+```
+
+### Aligned Quote Tokens
+
+The aligned quote token system enables non-USDC collateral:
+
+```
+AlignedQuoteTokenInfo:
+  liquid_quote_tokens               — Tokens accepted as quote collateral
+  quote_token_to_status             — Status per token (Enabled, NotAllowed)
+
+AlignedQuoteTokenConfig:
+  cross_scale                       — Scaling factor for cross-margin
+  vlm_contribution_scale            — Volume contribution scaling
+  fee_schedule                      — Fee rates for this quote token
+```
+
+The `isAligned` field on the account indicates whether the user's collateral is properly aligned with the DEX's expected quote token.
+
+## Sub-Account System
+
+Sub-accounts allow a master address to operate multiple isolated trading identities. Each sub-account gets its own clearinghouse state, spot state, and position tracking.
+
+### Creating Sub-Accounts
+
+```
+CreateSubAccountAction              — Creates a new sub-account under the master
+```
+
+The `sub_account_to_master` mapping tracks which master address owns each sub-account.
+
+### Sub-Account Operations
+
+| Action | Description |
+|--------|-------------|
+| `SubAccountModifyAction` | Modify settings (leverage, margin, orders) |
+| `SubAccountTransferAction` | Transfer USD between master and sub-account |
+| `SubAccountSpotTransferAction` | Transfer spot tokens between accounts |
+| `UsdClassTransferAction` | Transfer USD between account classes (perp to spot) |
+
+Spot transfers include fields for `token`, `amount`, and `destination` (target sub-account address).
+
+### Sub-Account State
+
+The API returns sub-account data within clearinghouse state:
+
+```
+subAccounts                         — Array of sub-account addresses
+extraAgents                         — Additional authorized agents
+```
+
+Sub-account tracking fields:
+
+| Field | Description |
+|-------|-------------|
+| `sub_account_tracker` | Tracks all sub-accounts in the system |
+| `sub_accounts` | List of sub-accounts for a user |
+| `subAccountUser.master` | The master/parent address |
+| `subAccountUser.isCross` | Whether this is a cross-margin sub-account |
+
+## Agent Authorization
+
+Agents (trading bots, vaults) can be authorized for abstraction operations:
+
+| Action | Description |
+|--------|-------------|
+| `AgentEnableDexAbstractionAction` | Agent enables DEX abstraction for a user |
+| `agentSetAbstraction` | Agent sets abstraction parameters |
+| `userSetAbstraction` | User sets their own abstraction config |
+
+This allows vault managers and automated systems to operate across abstraction tiers on behalf of users.
+
+## Cross-Margin vs Isolated
+
+The `isCross` field on sub-accounts and positions indicates the margin mode:
+
+- **`isCross: true`** -- Position uses cross-margin (shared collateral pool)
+- **`isCross: false`** -- Position is isolated (dedicated margin)
+
+### Liquidation Types
+
+| Type | Description |
+|------|-------------|
+| `LiquidateRequest::Cross` | Cross-margin liquidation |
+| `LiquidateRequest::Isolated` | Isolated position liquidation |
+| `borrowLendLiquidation` | Borrow/lend liquidation (portfolio margin) |
+
+## Action Types by Tier
+
+<AccordionGroup>
+  <Accordion title="Standard (no abstraction)">
+    - `CreateSubAccountAction` -- create sub-accounts
+    - `SubAccountModifyAction` -- modify leverage, orders, isolated margin
+    - `SubAccountTransferAction` -- USD transfers between accounts
+    - `SubAccountSpotTransferAction` -- spot token transfers
+    - `UsdClassTransferAction` -- perp to spot class transfers
+  </Accordion>
+  <Accordion title="DEX Abstraction">
+    - `activateDexAbstraction` -- enable abstraction
+    - `AgentEnableDexAbstractionAction` -- agent-initiated enable
+    - `UserDexAbstractionAction` -- user-initiated DEX abstraction operations
+    - `accountClassTransfer` -- cross-class transfers
+    - Source/destination DEX routing for inter-DEX transfers
+  </Accordion>
+  <Accordion title="Portfolio Margin / Unified">
+    - `UserPortfolioMarginAction` -- enable and configure portfolio margin
+    - `ActivateUnifiedAccount` -- one-way unification (irreversible)
+    - `borrowLend` integration for margin calculations
+    - `TokenDelegate` -- cross-system token delegation
+    - `LinkStakingUserAction` -- staking unification
+  </Accordion>
+</AccordionGroup>

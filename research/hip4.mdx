@@ -1,0 +1,158 @@
+---
+title: "HIP-4 Prediction Markets"
+sidebarTitle: "HIP-4"
+description: "Native L1 prediction markets on HyperLiquid. Binary outcome instruments with pair minting, CLOB trading, oracle settlement, and fee-on-close economics."
+icon: "scale-balanced"
+---
+
+HIP-4 introduces native prediction markets as first-class L1 instruments on HyperLiquid. These are binary outcome contracts that settle between 0 and 1, built on top of the HIP-3 deployment pipeline with distinct trading mechanics.
+
+## Core properties
+
+Unlike perpetual futures, prediction markets operate under a restricted set of rules:
+
+- **1x isolated margin only** -- no leverage, no liquidation
+- **No continuous oracle feed** and no funding rates
+- **Price = CLOB mid** during active trading
+- **Price bounds:** 0.001 to 0.999
+- **Loss is capped** at the amount paid to enter
+
+These constraints make prediction markets fundamentally different from perps. There is no liquidation risk because positions are fully collateralized by design.
+
+## Pair minting model
+
+Every prediction market has two tokens: **YES** and **NO**. They always sum to 1.00 in value.
+
+<Note>
+Buying YES at 0.40 is economically identical to selling NO at 0.60. The protocol enforces this invariant at the L1 level through the pair minting mechanism.
+</Note>
+
+When you deposit 1 unit of collateral, the protocol mints 1 YES token and 1 NO token. You can then sell the side you don't want on the orderbook.
+
+```
+1 collateral -> 1 YES + 1 NO (always)
+YES price + NO price = 1.00 (always)
+```
+
+## Four L1 actions
+
+HIP-4 defines four native actions for interacting with outcome markets:
+
+<AccordionGroup>
+  <Accordion title="SplitOutcome">
+    Deposit collateral to mint a matched pair of YES and NO tokens.
+
+    **Fields:** `collateral` (amount), `question` (market identifier)
+
+    This is the primary entry point. Depositing 1 USDC mints 1 YES + 1 NO. You then sell whichever side you don't want on the CLOB.
+  </Accordion>
+
+  <Accordion title="MergeOutcome">
+    Merge a matched pair of YES + NO tokens back into collateral.
+
+    **Fields:** `tokens` (amount to merge)
+
+    The inverse of SplitOutcome. If you hold both sides, you can recombine them to recover collateral without paying spread on the orderbook.
+  </Accordion>
+
+  <Accordion title="MergeQuestion">
+    Merge across a multi-outcome question.
+
+    **Fields:** `question` (market identifier)
+
+    Used for questions with more than two outcomes, allowing cross-outcome merges.
+  </Accordion>
+
+  <Accordion title="NegateOutcome">
+    Flip position direction.
+
+    **Fields:** `asset`, `amount`, and additional parameters
+
+    Converts a YES position into the equivalent NO position (or vice versa) without going through the orderbook.
+  </Accordion>
+</AccordionGroup>
+
+## Settlement
+
+Settlement is handled by a designated oracle address (`oracleUpdater`) that posts the final value:
+
+1. Oracle posts the resolution value
+2. Trading halts instantly
+3. All positions auto-settle in a single block
+4. Winners receive 1.00 per token, losers receive 0
+
+There is no gradual wind-down or expiry period. Settlement is atomic and immediate once the oracle posts.
+
+## Fee model
+
+<Warning>
+Opening a position is **free**. Fees are only charged on closing or settlement.
+</Warning>
+
+HIP-4 outcome markets use **spot fee rails**, meaning they inherit the spot trading fee schedule:
+
+| Action | Taker (cross) | Maker (add) |
+|--------|:------------:|:-----------:|
+| Open position | 0 bps | 0 bps |
+| Close on orderbook | 7.0 bps | 4.0 bps |
+| Settlement | 7.0 bps | -- |
+
+Fees are charged in the **outcome token**, not in USDC.
+
+A governance hook (`SetOutcomeFeeScale`) exists that allows validator vote to adjust outcome fee rates independently from base spot fees in the future.
+
+<Note>
+VIP tier discounts, staking discounts, and referral discounts all apply to outcome market fees the same way they apply to spot fees. See the [fee structure](/research/fees) page for full details.
+</Note>
+
+## Asset ID encoding
+
+Prediction market tokens use a distinct ID range within the HyperLiquid asset system:
+
+```
+Asset type          ID range
+──────────          ────────────────
+Perpetuals          0, 1, 2, ...        (BTC=0, ETH=1, ...)
+Spot tokens         10000+
+Spot variants       110000 - 170000+
+Prediction outcomes 1900000+
+```
+
+For EVM bridge operations, outcome tokens use a separate index scheme:
+
+```
+EVM bridge index = 100_000_000 + int(str(outcomeId) + str(sideId))
+
+Example:
+  "BTC > 68k" YES token = 100019520
+  "BTC > 68k" NO token  = 100019521
+```
+
+## Minimum order size
+
+The minimum order size is dynamic, based on the current mark price:
+
+```
+size x min(markPx, 1 - markPx) >= $10 USDC
+```
+
+This means cheaper outcomes (closer to 0 or 1) require larger token quantities to meet the $10 notional minimum. At a mark price of 0.10, you need at least 100 tokens. At 0.50, you need at least 20.
+
+## Deployment
+
+Any **HIP-3 deployer** can deploy HIP-4 prediction markets. Becoming a deployer requires staking **500,000 HYPE**.
+
+Deployment uses dedicated L1 actions:
+- `RegisterOutcome` -- register a new outcome market
+- `RegisterTokensAndStandaloneOutcome` -- register tokens and outcome in a single action
+
+Market structure is defined through:
+- `OutcomeSpec` -- defines the outcome parameters
+- `QuestionSpec` -- defines the question being resolved
+- `OutcomeTracker` -- tracks outcome state through its lifecycle
+
+### Deployer fee share
+
+Deployers earn a share of all trading fees generated by their markets. The `deployer_trading_fee_share` parameter controls the fraction, and the `fee_recipient` address receives the accumulated fees. This creates an economic incentive for deployers to create and promote active markets.
+
+See the [fee structure](/research/fees#deployer-fee-share) page for more details on deployer revenue mechanics.
