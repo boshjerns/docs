@@ -139,20 +139,47 @@ Place one or more new orders. Rare in the stream because most HFT operations use
 }
 ```
 
+| Field | Type | Description |
+|-------|------|-------------|
+| `orders[].asset` | `number` | Asset ID |
+| `orders[].side` | `string` | `"buy"` or `"sell"` |
+| `orders[].price` | `string` | Limit price |
+| `orders[].size` | `string` | Order size |
+| `orders[].reduceOnly` | `boolean` | Reduce-only flag |
+| `orders[].orderType` | `object` | `{"limit": ["Gtc"]}` (Good-til-Cancelled), `{"limit": ["Alo"]}` (Add Liquidity Only / post-only), `{"limit": ["Ioc"]}` (Immediate or Cancel) |
+| `orders[].cloid` | `string` | Client order ID (hex, optional) |
+
 ## modify
 
 Modify a single existing order. Same fields as one entry in `batchModify`.
 
+```json
+{
+  "type": "modify",
+  "data": {
+    "oid": "0x19d428d54d6882a00000000000000000",
+    "order": {
+      "asset": 0,
+      "side": "buy",
+      "price": "83000.00",
+      "size": "0.02",
+      "reduceOnly": false,
+      "orderType": {"limit": ["Gtc"]},
+      "cloid": "0x..."
+    }
+  }
+}
+```
+
 ## twapOrder
 
-Place a TWAP (Time-Weighted Average Price) order. Captured live:
+Place a TWAP (Time-Weighted Average Price) order that executes over a set number of minutes by splitting into smaller slices.
 
 ```json
 {
   "block": 70785606,
   "timestamp": 1774926670264,
   "type": "twapOrder",
-  "asset": "?",
   "asset_id": 170000,
   "data": {
     "asset": 170000,
@@ -163,9 +190,20 @@ Place a TWAP (Time-Weighted Average Price) order. Captured live:
 }
 ```
 
+| Field | Type | Description |
+|-------|------|-------------|
+| `asset` | `number` | Asset ID |
+| `isBuy` | `boolean` | Buy or sell |
+| `params[0]` | `string` | Total size to execute |
+| `params[1]` | `boolean` | Reduce-only flag |
+| `params[2]` | `number` | Duration in minutes |
+| `params[3]` | `boolean` | Randomize slice timing (adds jitter to reduce predictability) |
+
+<Note>The asset name may show as unresolved for margin variant asset IDs (110000-170000+ range) that don't have a direct name mapping. The `asset_id` field is always accurate.</Note>
+
 ## twapCancel
 
-Cancel a TWAP order.
+Cancel an active TWAP order by its ID.
 
 ```json
 {
@@ -177,9 +215,14 @@ Cancel a TWAP order.
 }
 ```
 
+| Field | Type | Description |
+|-------|------|-------------|
+| `asset` | `number` | Asset ID |
+| `twapId` | `number` | TWAP order ID to cancel |
+
 ## updateLeverage
 
-Change leverage for an asset.
+Change leverage for an asset. Affects margin requirements for all open positions on that asset.
 
 ```json
 {
@@ -191,6 +234,12 @@ Change leverage for an asset.
   }
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `asset` | `number` | Asset ID |
+| `isCross` | `boolean` | `true` for cross margin, `false` for isolated |
+| `leverage` | `number` | New leverage multiplier |
 
 ## updateIsolatedMargin
 
@@ -206,3 +255,9 @@ Add or remove margin from an isolated position.
   }
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `asset` | `number` | Asset ID |
+| `isBuy` | `boolean` | Which side of the position to adjust |
+| `ntli` | `number` | Net transfer to/from isolated margin (positive = add margin, negative = remove) |

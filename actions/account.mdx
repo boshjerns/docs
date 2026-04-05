@@ -5,7 +5,7 @@ description: Transfers, agent approval, governance, and staking action formats
 
 ## setReferrer
 
-Set a referral code. Captured live:
+Set a referral code for fee discounts. The `data` field is the referral code string.
 
 ```json
 {
@@ -18,9 +18,13 @@ Set a referral code. Captured live:
 }
 ```
 
+| Field | Type | Description |
+|-------|------|-------------|
+| `data` | `string` | Referral code to apply |
+
 ## agentSetAbstraction
 
-Agent sets account abstraction. Captured live:
+An authorized agent enables [DEX abstraction](/research/accounts) mode for the user's account. DEX abstraction allows unified margin across multiple DEX-listed assets.
 
 ```json
 {
@@ -33,9 +37,13 @@ Agent sets account abstraction. Captured live:
 }
 ```
 
+| Field | Type | Description |
+|-------|------|-------------|
+| `data` | `string` | Abstraction mode: `"u"` = unified (DEX abstraction enabled) |
+
 ## approveAgent
 
-Authorize a trading agent (bot) to act on behalf of the user.
+Authorize a trading agent (bot) to act on behalf of the user. Each account can have up to 1 unnamed + 3 named agents, plus 2 per sub-account.
 
 ```json
 {
@@ -48,9 +56,15 @@ Authorize a trading agent (bot) to act on behalf of the user.
 }
 ```
 
+| Field | Type | Description |
+|-------|------|-------------|
+| `agentAddress` | `string` | Address to authorize |
+| `agentName` | `string` | Display name for the agent |
+| `extraAgentName` | `string\|null` | Optional secondary name |
+
 ## usdSend
 
-Transfer USDC to another address on HyperLiquid.
+Transfer USDC to another address on HyperLiquid L1. Internal transfer, no bridge involved.
 
 ```json
 {
@@ -62,9 +76,14 @@ Transfer USDC to another address on HyperLiquid.
 }
 ```
 
+| Field | Type | Description |
+|-------|------|-------------|
+| `destination` | `string` | Recipient address |
+| `amount` | `string` | Amount in USDC |
+
 ## withdraw3
 
-Withdraw USDC from HyperLiquid to an external chain.
+Withdraw USDC from HyperLiquid to Arbitrum via the L1 bridge. The "3" in the name reflects the third iteration of the withdrawal action type. Finalization takes approximately 5 minutes with a $1 fee.
 
 ```json
 {
@@ -75,6 +94,11 @@ Withdraw USDC from HyperLiquid to an external chain.
   }
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `amount` | `string` | Amount in USDC |
+| `destination` | `string` | Destination address on Arbitrum |
 
 ## vaultTransfer
 
@@ -91,6 +115,12 @@ Deposit to or withdraw from a vault.
 }
 ```
 
+| Field | Type | Description |
+|-------|------|-------------|
+| `vaultAddress` | `string` | Vault address |
+| `isDeposit` | `boolean` | `true` = deposit, `false` = withdraw |
+| `usd` | `string` | Amount in USDC |
+
 ## subAccountTransfer
 
 Transfer funds between main account and sub-account.
@@ -106,9 +136,15 @@ Transfer funds between main account and sub-account.
 }
 ```
 
+| Field | Type | Description |
+|-------|------|-------------|
+| `subAccountUser` | `string` | Sub-account address |
+| `isDeposit` | `boolean` | `true` = transfer to sub-account, `false` = transfer to main |
+| `usd` | `string` | Amount in USDC |
+
 ## tokenDelegate
 
-Delegate or undelegate HYPE tokens to a validator.
+Delegate or undelegate HYPE tokens to a validator. Delegation has a 1-day lockup per validator, undelegation enters a 7-day queue.
 
 ```json
 {
@@ -121,9 +157,15 @@ Delegate or undelegate HYPE tokens to a validator.
 }
 ```
 
+| Field | Type | Description |
+|-------|------|-------------|
+| `validator` | `string` | Validator address |
+| `amount` | `string` | Amount of HYPE |
+| `isUndelegate` | `boolean` | `true` = undelegate, `false` = delegate |
+
 ## govVote
 
-Vote on a governance proposal.
+Vote on a governance proposal. Stake-weighted voting.
 
 ```json
 {
@@ -134,6 +176,11 @@ Vote on a governance proposal.
   }
 }
 ```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `proposalId` | `number` | Proposal ID |
+| `vote` | `boolean` | `true` = approve, `false` = reject |
 
 <Note>
 Account and transfer actions like `usdSend`, `withdraw3`, `vaultTransfer`, `tokenDelegate`, and `govVote` are infrequent on mainnet (a few per hour). They are fully formatted with named fields when they do appear.

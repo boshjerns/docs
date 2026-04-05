@@ -5,7 +5,13 @@ description: "L1 to Ethereum bridge mechanics. Deposit flow, withdrawal flow, va
 icon: "bridge"
 ---
 
-The HyperLiquid bridge handles all asset movement between the L1 and Ethereum mainnet. It is a **validator-voted system**: both deposits and withdrawals require quorum agreement from the active bridge validator set before execution.
+The HyperLiquid bridge handles all asset movement between the L1 and Arbitrum. It is a **validator-voted system**: both deposits and withdrawals require quorum agreement from the active bridge validator set before execution.
+
+Key numbers:
+- **Withdrawal time:** ~5 minutes to finalize
+- **Withdrawal fee:** $1 USDC
+- **Quorum:** 2/3+ of bridge validator stake weight must agree
+- **Bridge validator set:** distinct from the consensus validator set, updated when the consensus set changes
 
 ## Bridge state
 
@@ -79,7 +85,7 @@ Deposits are the only way to move USDC onto HyperLiquid L1. All deposit events m
 
 ## Withdrawal flow
 
-Withdrawals move assets from HyperLiquid L1 back to Ethereum. The process includes a time-lock period and requires validator signatures.
+Withdrawals move assets from HyperLiquid L1 to Arbitrum. The process includes a time-lock period and requires validator signatures. Users initiate withdrawals by submitting a `withdraw3` action (see [Account Actions](/actions/account#withdraw3)).
 
 <Steps>
   <Step title="User requests withdrawal">

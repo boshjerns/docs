@@ -73,10 +73,14 @@ Oracle Price = $100.00
 Impact Bid = $100.08
 Impact Ask = $100.12
 Premium = ($100.08 + $100.12) / 2 - $100.00 = $0.10
-Funding Rate = clamp($0.10 / $100.00 + 0, -0.05%, +0.05%) = 0.10%
+Funding Rate = clamp($0.10 / $100.00 + 0, -0.05%, +0.05%) = 0.05%
 ```
 
-In this example, longs would pay shorts 0.10% of their position value at the next funding settlement.
+In this example, the raw premium is 0.10% but it exceeds the clamp, so the funding rate is capped at 0.05%. Longs would pay shorts 0.05% of their position value at the next funding settlement.
+
+### Settlement frequency
+
+Funding is settled **every hour** at one-eighth of the computed 8-hour rate. The formula calculates an 8-hour funding rate, but payments are distributed hourly in equal installments. For example, a 0.05% 8-hour rate results in ~0.00625% paid each hour.
 
 ### Binance formula option
 
