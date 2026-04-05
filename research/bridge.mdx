@@ -44,27 +44,27 @@ ValidatorSetSnapshot -- point-in-time snapshot including:
 
 The bridge epoch increments whenever the validator set changes, ensuring that operations signed under an old validator set cannot be replayed.
 
-## Ethereum event identification
+## Event identification
 
-Every Ethereum event observed by the bridge is identified by an `EthEventId`:
+Every bridge event on Arbitrum is identified by an `EthEventId` (the "Eth" prefix is HyperLiquid's internal naming convention):
 
 ```
 EthEventId:
-  block_number  -- Ethereum block number
+  block_number  -- Arbitrum block number
   event_type    -- Deposit, WithdrawalFinalized, ValidatorSetUpdate, etc.
   event_index   -- index within the block
-  tx_hash       -- Ethereum transaction hash
+  tx_hash       -- Arbitrum transaction hash
 ```
 
-This uniquely identifies any event on Ethereum that the bridge needs to process.
+This uniquely identifies any event on Arbitrum that the bridge needs to process.
 
 ## Deposit flow
 
 Deposits move assets from Arbitrum to HyperLiquid L1. The flow requires validator quorum before crediting the user.
 
 <Steps>
-  <Step title="Ethereum deposit detected">
-    Validators independently observe a deposit event on Ethereum, identified by its `EthEventId`.
+  <Step title="Arbitrum deposit detected">
+    Validators independently observe a deposit event on Arbitrum, identified by its `EthEventId`.
   </Step>
   <Step title="Validators vote">
     Each validator submits a `VoteEthDepositAction` referencing the `ethId` of the L1 event. Votes accumulate in `eth_id_to_deposit_votes`.
@@ -119,7 +119,7 @@ PendingWithdrawals:
 
 ## Validator set updates
 
-When the HyperLiquid validator set changes, the bridge must update its Ethereum-side validator set to keep bridge operations secure. This is a multi-step process with its own quorum requirement.
+When the HyperLiquid validator set changes, the bridge must update its Arbitrum-side validator set to keep bridge operations secure. This is a multi-step process with its own quorum requirement.
 
 <Steps>
   <Step title="Update proposed">
@@ -129,7 +129,7 @@ When the HyperLiquid validator set changes, the bridge must update its Ethereum-
     Each validator submits a `SignValidatorSetUpdateAction` containing their signature over the new set. Signatures accumulate in `validator_set_signatures`.
   </Step>
   <Step title="Finalization">
-    Once quorum is reached via `validator_set_finalized_votes`, a `VoteEthFinalizedValidatorSetUpdateAction` confirms the update is committed on Ethereum.
+    Once quorum is reached via `validator_set_finalized_votes`, a `VoteEthFinalizedValidatorSetUpdateAction` confirms the update is committed on Arbitrum.
   </Step>
 </Steps>
 
