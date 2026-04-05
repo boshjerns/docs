@@ -13,6 +13,31 @@ BOLE operates as a top-level component within HyperLiquid's application state, a
 
 Each supported token has its own **reserve pool** with independent interest rates, utilization tracking, and liquidation parameters. Users supply tokens to earn yield or borrow against their collateral.
 
+### Pool State
+
+The lending pool maintains 21 state fields at the top level of the application state:
+
+| Field | Purpose |
+|-------|---------|
+| `active` | Whether the lending pool is currently active |
+| `risk_free_rate` | Baseline risk-free interest rate (validator-voted) |
+| `nonce` | Monotonic nonce for lending operations |
+| `assets` | Token assets available in the pool |
+| `abstraction` | Integration with the account abstraction layer |
+| `action_to_tracker` | Tracks pending lending actions |
+| `prune_bucket_guard` | Rate-limiting guard for state pruning |
+
+Each token's reserve is tracked through several nested structures:
+
+```
+Reserve              — per-token reserve pool (9+ fields)
+ReserveAccumulator   — cumulative interest accrual per reserve
+ReserveIndex         — index into the reserve accumulator
+ReserveLegState      — tracks one side (supply or borrow) of a reserve
+```
+
+The lending system maintains a two-sided book structure (supply side and borrow side), mirroring the order book architecture used for trading. This enables efficient matching of supply and demand within each token pool.
+
 ## Interest Rate Model
 
 BOLE uses a **kink model** (also called a jump-rate model), the same design used by Compound and Aave. The model creates two distinct rate regimes based on pool utilization.
@@ -147,6 +172,16 @@ All liquidation modes can execute through TWAP (Time-Weighted Average Price) ord
 - Liquidation processing runs as a periodic background task
 
 This TWAP approach is particularly important for large positions where an immediate market dump would cause excessive slippage and cascading liquidations.
+
+### Liquidation Execution
+
+Liquidation processing runs as a periodic background task in the execution pipeline, alongside funding rate updates and HIP-3 oracle refreshes. The fixed execution sequence is:
+
+```
+update_funding_rates → refresh_hip3 → apply_bole_liquidations
+```
+
+This ordering ensures that funding rate changes (which affect margin levels) are applied before liquidation checks run. System-initiated liquidation actions handle interest accrual and automatic liquidation triggers independently of user actions.
 
 ## Integration with Portfolio Margin
 

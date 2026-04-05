@@ -13,9 +13,9 @@ The oracle layer provides price feeds for all assets on the exchange. Oracles ar
 
 | Oracle Kind | Description |
 |-------------|-------------|
-| `Open` | Standard open oracle, accepts external price updates |
-| `Queue` | Queued oracle with batched price delivery |
-| `Round` | Round-based oracle with discrete update windows |
+| `Open` | Continuously updated oracle. Validators publish prices every ~3 seconds, computed as a weighted median across external exchanges (Binance weight 3, OKX 2, Bybit 2, Kraken 1, Kucoin 1, Gate IO 1, MEXC 1, HL spot 1). The final oracle price is the stake-weighted median of validator submissions. |
+| `Queue` | Queued delivery oracle. Price updates are batched and applied in sequence, used for assets where atomic price updates could create extraction opportunities. |
+| `Round` | Round-based oracle with discrete update windows. Prices update at fixed intervals rather than continuously, suitable for assets with lower liquidity or update frequency requirements. |
 
 Each block receives multiple price inputs that feed into funding calculations:
 

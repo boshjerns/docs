@@ -46,7 +46,16 @@ Through precompiles, EVM contracts can access:
 
 ### Precompile Interface
 
-Precompiles accept structured input specifying which L1 data to read and return the result or an error. Each precompile has a dedicated address mapped within the EVM. Refer to HyperLiquid's EVM documentation for current precompile addresses and calling conventions.
+Precompiles use a typed request/response model:
+
+- **Input:** `ReadPrecompileInput` — a structured type specifying which L1 data to read (asset, user address, query parameters)
+- **Output:** `ReadPrecompileResult` — either `Ok` with the requested data or an error describing what went wrong
+
+Each precompile is assigned a dedicated EVM address through the `PrecompileToAddress` mapping. The system tracks the `highest_precompile_address` to efficiently determine whether a call targets a precompile or a regular contract.
+
+Usage metrics are recorded via `precompile_calls`, which tracks how many times each precompile has been invoked. This is useful for monitoring which L1 data EVM contracts access most frequently.
+
+Precompiles are lazily initialized on a per-epoch basis, controlled by `precompile_lazy_epoch_round`. This means a precompile may not be available until its first access within a given epoch triggers initialization. Refer to HyperLiquid's EVM documentation for current precompile addresses and calling conventions.
 
 <Warning>
   Precompile availability may vary between mainnet and testnet. Some precompiles are lazily initialized per epoch.
@@ -104,6 +113,19 @@ USDC is bridged to HyperEVM through the `UsdcEvmContract` system:
 - `SystemAlignedQuoteSupplyDeltaAction` — mint/burn USDC on EVM
 - `usdc_evm_system_balance` — tracks the system's USDC balance on EVM
 - Supply changes are governed by validator consensus
+
+## Aligned Quote Tokens
+
+The stablecoin settlement infrastructure uses aligned quote tokens:
+
+| Field | Purpose |
+|-------|---------|
+| `AlignedQuoteToken` | Base settlement token |
+| `AlignedQuoteTokenConfig` | Per-token configuration |
+| `cross_scale` | Cross-margin scale factor |
+| `vlm_contribution_scale` | Volume contribution scaling for fee tier calculation |
+
+Supply changes (minting/burning) are handled through `SystemAlignedQuoteSupplyDeltaAction` and require validator consensus.
 
 <Note>
   EVM transactions are visible in the L1 data stream before they execute on-chain, providing pre-confirmation visibility for monitoring and analytics.

@@ -1,0 +1,183 @@
+---
+title: "Exchange State"
+sidebarTitle: "Exchange State"
+description: "Top-level state architecture, context fields, safety guards, and ledger delta types."
+icon: "database"
+---
+
+HyperLiquid maintains a comprehensive exchange state that encompasses all market data, user accounts, and protocol configuration. The state is organized around a central structure called the **locus**, which contains market context, execution state, and all active order books.
+
+## Top-level state structure
+
+The complete exchange state is organized around the locus and a set of top-level components that manage protocol-wide concerns.
+
+### Locus
+
+The locus is the core container for all exchange execution state:
+
+```
+locus:
+  context:
+    initial_height        genesis block height
+    height                current block height
+    round                 current consensus round
+    time                  current block timestamp
+    next_oid              next available order ID
+    next_lid              next available liquidation ID
+    next_twap_id          next available TWAP order ID
+    system_nonce          monotonic system nonce
+    hardfork              active hardfork version
+
+  perp_dexs[]             array of perpetual DEX order books
+  spot_books              spot market order books
+  agent_tracker           agent authorization tracking
+  sub_account_tracker     sub-account management
+  allowed_liquidators     addresses authorized to liquidate
+  bridge                  L1<>Arbitrum bridge state
+```
+
+The `context` fields are updated every block and provide the global reference point for all execution. The `next_oid`, `next_lid`, and `next_twap_id` counters are monotonically increasing and guarantee unique identifiers across the lifetime of the exchange.
+
+### Top-level components
+
+Alongside the locus, the protocol maintains several top-level components:
+
+| Component | Purpose |
+|-----------|---------|
+| `fee_schedule` | Fee tiers and maker/taker rates |
+| `gas_auction` | Priority transaction auction state |
+| `perp_deploy_gas_auction` | Perp market deployment auction |
+| `spot_pair_deploy_gas_auction` | Spot pair deployment auction |
+| `hyper_evm` | HyperEVM execution state |
+| `app_hash_vote_tracker` | Consensus hash voting across validators |
+| `user_to_evm_state` | Per-user EVM account state |
+| `multi_sig_tracker` | Multi-signature wallet tracking |
+| `reserve_accumulators` | Lending interest accumulation |
+| `partial_liquidation_cooldown` | Liquidation rate limiting per account |
+| `evm_enabled` | HyperEVM feature flag |
+| `validator_l1_stream_tracker` | Validator L1 stream state |
+| `distribute_funding_guard` | Funding distribution safety guard |
+| `update_funding_guard` | Funding rate update safety guard |
+
+<Note>
+The `hardfork` field in the context tracks which protocol version is active. Hardfork transitions are coordinated across all validators and activate new features or change execution semantics at a specific block height.
+</Note>
+
+## Safety guards
+
+The protocol maintains a set of safety guards that protect exchange integrity and enforce operational limits. These guards can be updated through governance actions.
+
+| Guard | Purpose |
+|-------|---------|
+| `max_order_distance_from_anchor` | Maximum price deviation from anchor price. Prevents orders at extreme prices that could cause adverse fills. |
+| `scheduled_freeze_height` | Block height at which the exchange state freezes for scheduled maintenance. |
+| `cancel_aggressive_orders_at_open_interest_cap_guard` | Automatically cancels aggressive orders when a market's open interest cap is reached. |
+| `post_only_until_time` | Enforces post-only mode until a specific timestamp. Used during new market launches to allow the order book to build before aggressive orders are permitted. |
+| `post_only_until_height` | Enforces post-only mode until a specific block height. Alternative to the time-based guard. |
+| `spot_disabled` | Kill switch that disables all spot trading across the exchange. |
+| `max_hlp_withdraw_fraction_per_day` | Limits daily HLP vault withdrawals as a fraction of total vault value. Prevents liquidity drain. |
+| `hlp_start_of_day_account_value` | Tracks HLP account value at the start of each day for withdrawal limit calculations. |
+
+<Warning>
+The `post_only_until_time` and `post_only_until_height` guards are commonly active during new market launches. During this period, only limit orders that add liquidity are accepted. Market orders and crossing limit orders are rejected.
+</Warning>
+
+## Ledger deltas
+
+Every action on HyperLiquid produces a **ledger delta** that records all resulting balance changes. Ledger deltas provide a complete audit trail of every state mutation.
+
+### Deposits and withdrawals
+
+| Delta type | Description |
+|------------|-------------|
+| `deposit` | USDC deposit credited to an account |
+| `welcomeBonus` | Bonus credited on first deposit |
+
+### Vault operations
+
+| Delta type | Description |
+|------------|-------------|
+| `vaultCreate` | New vault creation |
+| `vault` | General vault state change |
+| `vaultDeposit` | Deposit into a vault |
+| `vaultWithdraw` | Withdrawal from a vault |
+| `vaultDistribution` | Profit/loss distribution to vault depositors |
+| `vaultLeaderCommission` | Commission paid to vault leader |
+| `requestedUsd` | Requested USD amount for vault operation |
+| `commission` | Commission amount |
+| `closingCost` | Cost of closing a vault position |
+| `basis` | Cost basis tracking |
+| `netWithdrawnUsd` | Net withdrawn USD amount |
+| `accountValue` | Account value at time of operation |
+| `leverageType` | Leverage configuration |
+| `liquidatedPositions` | Positions liquidated within a vault |
+
+### Funding
+
+| Delta type | Description |
+|------------|-------------|
+| `funding` | Funding payment credited or debited |
+| `fundingRate` | Funding rate applied |
+
+### Transfers
+
+| Delta type | Description |
+|------------|-------------|
+| `destination` | Transfer destination account |
+| `accountClassTransfer` | Transfer between account classes (cross/isolated) |
+| `subAccountTransfer` | Transfer between sub-accounts |
+| `spotTransfer` | Spot token transfer |
+| `usdcValue` | USDC equivalent value of a transfer |
+
+### Fees and gas
+
+| Delta type | Description |
+|------------|-------------|
+| `nativeTokenFee` | Fee paid in native HYPE token |
+| `gossipPriorityGasAuction` | Priority gas auction fee |
+| `GasAuctionDetails` | Detailed gas auction breakdown |
+
+### Token operations
+
+| Delta type | Description |
+|------------|-------------|
+| `spotGenesis` | Initial spot token allocation |
+| `rewardsClaim` | Staking or points reward claim |
+| `accountActivationGas` | Gas fee for account activation |
+
+### Account management
+
+| Delta type | Description |
+|------------|-------------|
+| `activateDexAbstraction` | DEX abstraction activation for an account |
+| `dex` | DEX-related state change |
+| `sourceDex` | Source DEX in a cross-DEX operation |
+| `destinationDex` | Destination DEX in a cross-DEX operation |
+| `isDeposit` | Boolean flag indicating deposit vs withdrawal |
+
+### Lending
+
+| Delta type | Description |
+|------------|-------------|
+| `borrowLend` | Borrow or lend operation |
+| `interestAmount` | Interest accrued on a position |
+
+## Per-block execution data
+
+Each committed block produces a set of structured outputs that capture everything that happened during execution:
+
+| Output | Description |
+|--------|-------------|
+| `node_trades` | Executed trades with price, size, and participants |
+| `node_fills` | Fill events for matched orders |
+| `node_twap_statuses` | TWAP order progress and completion updates |
+| `node_raw_book_diffs` | Raw order book changes (additions, removals, modifications) |
+| `node_order_statuses` | Order lifecycle updates (placed, partially filled, cancelled) |
+| `misc_events` | Protocol events that do not fit other categories |
+| `hip3_oracle_updates` | HIP-3 oracle price feed updates |
+| `system_and_core_writer_actions` | System-level actions including EVM bridge operations |
+| `evm_block_and_receipts` | HyperEVM block data and transaction receipts |
+
+<Note>
+The `node_raw_book_diffs` output provides the lowest-level view of order book mutations and is the basis for reconstructing the full order book state from a snapshot plus incremental updates.
+</Note>

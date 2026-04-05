@@ -59,7 +59,8 @@
               "research/consensus",
               "research/action-types",
               "research/hip4",
-              "research/gas-auctions"
+              "research/gas-auctions",
+              "research/state"
             ]
           },
           {
