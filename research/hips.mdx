@@ -1,0 +1,74 @@
+---
+title: "HIP-1 & HIP-2"
+sidebarTitle: "HIP-1 & HIP-2"
+description: "Native token standard (HIP-1) and hyperliquidity AMM (HIP-2) specifications."
+icon: "coins"
+---
+
+HIP-1 and HIP-2 define HyperLiquid's native token standard and automated market making strategy. Together they enable permissionless token launches with guaranteed initial liquidity.
+
+## HIP-1: Native Token Standard
+
+HIP-1 defines the native token format on HyperLiquid's L1. Unlike ERC-20 tokens which live on the EVM, HIP-1 tokens are first-class L1 primitives with built-in orderbook trading.
+
+### Token genesis parameters
+
+Every HIP-1 token is created with these genesis fields:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Token name |
+| `weiDecimals` | Decimal precision for the smallest unit |
+| `szDecimals` | Decimal precision for order sizing |
+| `maxSupply` | Maximum token supply |
+| `initialWei` | Initial supply in wei (smallest unit) |
+| `anchorTokenWei` | Anchor token amount for price discovery |
+
+### Deployment auction
+
+New HIP-1 tokens are deployed through a Dutch auction mechanism. The auction starts at a high price and decays linearly over a **31-hour cycle** (deliberately not 24 hours, so the cheapest window rotates globally across time zones).
+
+Starting price: **500 HYPE** for spot pair deployment.
+
+See [Gas Auctions](/research/gas-auctions) for full auction mechanics.
+
+### Token registry
+
+All deployed tokens are tracked in the `SpotClearinghouse`, which serves as the canonical token registry. Token metadata, supply, and trading parameters are stored here.
+
+## HIP-2: Hyperliquidity
+
+HIP-2 defines the **Hyperliquidity** strategy — an automated market making system that provides guaranteed initial liquidity for newly launched tokens.
+
+### How it works
+
+When a token launches, HIP-2 places a grid of resting orders on both sides of the order book using the following parameters:
+
+| Parameter | Description |
+|-----------|-------------|
+| `startPx` | Initial price for the order grid |
+| `nOrders` | Number of orders on each side |
+| `orderSz` | Size of each individual order |
+| `nSeededLevels` | Number of price levels to seed initially |
+
+### Price formula
+
+HIP-2 uses a recursive price formula to space orders geometrically:
+
+```
+px_i = round(px_{i-1} × 1.003)
+```
+
+Each subsequent price level is 0.3% above the previous one. This creates a guaranteed **0.3% spread** between price levels, ensuring consistent liquidity density.
+
+### Update frequency
+
+The HIP-2 strategy refreshes its orders on blocks with **3+ second intervals**. This prevents excessive order churn while keeping the grid responsive to genuine price movements.
+
+### Integration with HIP-3
+
+HIP-3 (builder-deployed perpetuals) can enable **growth mode** which reduces fees by 90% for HIP-3 assets, incentivizing liquidity in newly deployed markets. The HIP-2 strategy works alongside HIP-3 to provide both spot and perpetual liquidity for new tokens.
+
+<Note>
+HIP-2 liquidity is protocol-provided, not user-deposited. The orders come from the protocol itself, ensuring every new token has a functioning market from the moment of launch.
+</Note>

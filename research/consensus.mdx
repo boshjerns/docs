@@ -117,6 +117,37 @@ The consensus layer maintains a snapshot of heartbeat state:
 | `jailed_validators` | Validators currently removed from the active set |
 </Accordion>
 
+## Heartbeat jailing configuration
+
+The heartbeat system enforces both liveness AND performance standards through configurable thresholds:
+
+```
+HeartbeatJailingConfig:
+  dry_run                       — test mode (monitor without actual jailing)
+  latency_ema_jail_threshold    — EMA latency threshold that triggers jailing
+```
+
+Per-validator heartbeat tracking:
+
+| Field | Purpose |
+|-------|---------|
+| `since_last_success` | Time elapsed since last successful heartbeat |
+| `last_ack_duration` | Latency of the most recent heartbeat acknowledgment |
+| `latency` | Current measured latency |
+| `latency_ema` | Exponential moving average of latency over time |
+
+The `HeartbeatSnapshot` captures the full liveness picture at any point:
+
+```
+HeartbeatSnapshot:
+  validators_missing_heartbeat   — validators that have not sent a heartbeat
+  disconnected_validators        — validators with broken connections
+  heartbeat_statuses             — per-validator heartbeat state
+  jailed_validators              — currently jailed validators
+```
+
+Validators with consistently high latency (latency_ema exceeding the threshold) can be jailed even if they are technically producing heartbeats. This enforces performance standards, not just liveness.
+
 ## Jailing
 
 Validators that fail to maintain liveness or performance standards are **jailed** -- temporarily removed from the active validator set. Jailed validators cannot propose blocks or participate in voting until they are unjailed.

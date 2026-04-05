@@ -1,0 +1,97 @@
+---
+title: "Historical Data"
+sidebarTitle: "Historical Data"
+description: "S3 archive buckets, data formats, indexer tables, and historical data access."
+icon: "database"
+---
+
+HyperLiquid provides historical data through S3 archive buckets and maintains several indexer tables for querying historical events.
+
+## S3 Archive Buckets
+
+Historical data is available through AWS S3 buckets using requester-pays access:
+
+| Bucket | Content |
+|--------|---------|
+| `s3://hyperliquid-archive/market_data/` | L2 book snapshots and asset contexts. Updated monthly, LZ4 compressed. |
+| `s3://hl-mainnet-node-data/node_fills_by_block` | Current fills stream organized by block |
+| `s3://hl-mainnet-node-data/explorer_blocks` | Explorer block data |
+| `s3://hl-mainnet-node-data/replica_cmds` | L1 transaction blocks (raw committed actions) |
+
+<Note>
+S3 access uses requester-pays, meaning the downloader pays for data transfer costs. The `market_data` bucket contains monthly updates with LZ4-compressed snapshots.
+</Note>
+
+### Data volume
+
+The L1 produces approximately **100 GB per day** of raw data across all output types. State snapshots are taken every 10,000 blocks.
+
+## Indexer Tables
+
+The L1 indexer maintains several tables for historical event queries:
+
+| Table | Description |
+|-------|-------------|
+| `UserFills` | Per-user trade fill history |
+| `AssetTrades` | Per-asset trade history |
+| `FundingHistory` | Historical funding rate payments |
+| `AssetCtxHistory` | Historical asset context (OI, mark price, funding) |
+| `OrderHistory` | Full order lifecycle history |
+| `UserTwapSliceFills` | TWAP order slice execution history |
+| `BoleInterest` | Borrow/lend interest accrual events |
+| `LegacyRewardHistory` | Historical reward distributions |
+| `ExplorerUserTxs` | Explorer-indexed user transactions |
+
+These tables are accessible through the info API endpoints (`userFills`, `userFillsByTime`, `userFunding`, `historicalOrders`, `userTwapSliceFills`, etc.)
+
+## State Snapshots
+
+Full exchange state snapshots are serialized in MessagePack format. These snapshots capture the complete exchange state at a point in time, including:
+
+- All order books (perp and spot)
+- User positions and balances
+- Funding state
+- Bridge state
+- Governance/staking state
+- EVM state
+
+Non-validator nodes can request state snapshots to bootstrap without replaying the entire history.
+
+## Data Formats
+
+### L1 Data Schemas
+
+The L1 node produces several data types per block:
+
+| Output | Format | Description |
+|--------|--------|-------------|
+| `node_trades` | JSON | Executed trades with full side info |
+| `node_fills` | JSON | Fill events with user attribution |
+| `node_order_statuses` | JSON | Order lifecycle events (30+ status types) |
+| `node_raw_book_diffs` | JSON | Order book mutations (new/update/remove) |
+| `node_twap_statuses` | JSON | TWAP order progress updates |
+| `misc_events` | JSON | Deposits, delegations, withdrawals, rewards, funding |
+| `hip3_oracle_updates` | JSON | HIP-3 deployer oracle price updates |
+
+### Trade format
+
+Each trade record includes:
+
+```
+Trade:
+  coin        — asset identifier
+  side        — buy or sell
+  time        — execution timestamp
+  px          — execution price
+  sz          — execution size
+  hash        — transaction hash
+  side_info   — per-side details (user, start_pos, oid, twap_id, cloid)
+```
+
+### Order status format
+
+Order lifecycle events include the full order struct plus a status field with 30+ possible values covering placement, fills, cancellations, and rejections.
+
+<Warning>
+Historical data volumes are substantial. The fills stream alone can produce gigabytes per day during active markets. Plan storage and processing capacity accordingly.
+</Warning>

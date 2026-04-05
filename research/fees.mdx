@@ -188,3 +188,65 @@ Response includes:
 | `feeTrialEscrow` | Escrowed USDC for trial |
 | `nextTrialAvailableTimestamp` | Next trial availability |
 | `feeSchedule` | Full fee schedule with all tiers |
+
+## Request weight system
+
+HyperLiquid implements a request weight system that governs API rate limits. Every API request consumes a certain amount of request weight from the user's allocation.
+
+### Expanding request weight
+
+Users can purchase additional request weight through the `reserveRequestWeight` action at a cost of **0.0005 USDC per request weight unit**. This provides a self-service mechanism to scale API access beyond the default allocation.
+
+### Rate limit queries
+
+Users can check their current rate limit status via the `userRateLimit` info endpoint, which returns:
+- Current request weight consumption
+- Remaining allocation
+- Reset timing
+
+<Note>
+Request weight is separate from WebSocket subscription limits. A user on a higher fee tier automatically receives higher default request weight allocations.
+</Note>
+
+## Fee schedule internals
+
+The protocol maintains a `FeeSchedule` structure that encapsulates all fee configuration:
+
+```
+FeeSchedule:
+  base_rates        — perp and spot base taker/maker rates
+  vip_tiers         — volume-based tier thresholds and rates
+  mm_rebate_tiers   — market maker rebate tiers
+  stake_discounts   — HYPE staking discount tiers
+  referral_discount — flat referral discount rate
+  builder_fee_caps  — maximum builder fees (perp and spot)
+```
+
+### Fee trials
+
+Fee trials allow users to temporarily test a lower fee tier:
+
+1. User initiates via `startFeeTrial` action
+2. An escrow is placed for the trial period
+3. During the trial, the user pays the lower tier's rates
+4. After the trial ends, the escrow is returned and fees revert
+5. A cooldown period prevents immediate re-trials
+
+### Fee reassessment
+
+The `reassessFees` action triggers a recalculation of a user's fee tier based on their current 14-day rolling volume. This is useful after large trading periods to ensure the correct tier is applied without waiting for the automatic reassessment cycle.
+
+### Override states
+
+Fee tiers can be overridden through several mechanisms:
+
+| Override | Description |
+|----------|-------------|
+| VIP tier | Automatic based on 14-day volume |
+| Market maker | Applied based on maker fraction qualification |
+| Staking discount | Multiplicative with other discounts |
+| Referral discount | Flat 4%, multiplicative with staking |
+| Builder fee | Additive, set per-order by builder |
+| Fee trial | Temporary tier override during trial period |
+
+When multiple overrides apply, they stack multiplicatively (not additively). For example, a 4% referral discount combined with a 40% staking discount yields approximately 42.4% total discount, not 44%.

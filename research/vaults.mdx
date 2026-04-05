@@ -1,0 +1,90 @@
+---
+title: "Vaults"
+sidebarTitle: "Vaults"
+description: "Vault creation, deposits, withdrawals, leader commission, HLP protocol vaults, and vault governance."
+icon: "vault"
+---
+
+HyperLiquid's vault system allows users to deposit funds into managed trading strategies. Vaults range from the protocol-owned HLP (HyperLiquidity Provider) to user-created vaults with custom strategies.
+
+## Vault types
+
+### Protocol vaults (HLP)
+
+The HyperLiquidity Provider (HLP) is HyperLiquid's protocol-owned vault that provides liquidity across all markets. It acts as the primary market maker and backstop liquidity source.
+
+HLP has protocol-level withdrawal limits to prevent bank runs:
+
+| Parameter | Purpose |
+|-----------|---------|
+| `max_hlp_withdraw_fraction_per_day` | Maximum fraction of HLP that can be withdrawn in a single day |
+| `hlp_start_of_day_account_value` | HLP's account value at the start of the day, used for withdrawal limit calculation |
+
+### User vaults
+
+Any user can create a vault and accept deposits from other users. The vault leader executes trades on behalf of all depositors.
+
+## Vault actions
+
+| Action | Description |
+|--------|-------------|
+| `createVault` | Create a new vault with initial parameters |
+| `vaultModify` | Modify vault parameters (strategy settings, permissions) |
+| `vaultTransfer` | Deposit into or withdraw from a vault |
+| `vaultDistribute` | Distribute vault earnings to depositors |
+
+## Vault lifecycle
+
+### Creation
+
+A vault is created via `createVault`. The creator becomes the vault leader with trading authority over deposited funds.
+
+### Deposits and withdrawals
+
+Users interact with vaults through `vaultTransfer`:
+- **Deposits** add funds to the vault's trading pool
+- **Withdrawals** remove funds, subject to any vault-specific or protocol-level limits
+
+When a vault processes withdrawals, any open orders that conflict with the withdrawal are automatically cancelled with reason `vaultWithdrawalCanceled`. An internal order type `CloseForVaultWithdrawal` handles position closure needed to free up withdrawal funds.
+
+### Earnings distribution
+
+Vault leaders can distribute earnings via `vaultDistribute`. The distribution includes:
+
+| Component | Description |
+|-----------|-------------|
+| `vaultDistribution` | The distributed earnings amount |
+| `vaultLeaderCommission` | Leader's commission from the distribution |
+| `commission` | Commission details in the ledger delta |
+| `accountValue` | Account value at time of distribution |
+
+### Vault modification
+
+`vaultModify` allows the vault leader to update parameters. Changes to vault parameters require governance approval through `VoteGlobalAction::VaultModification`.
+
+## Ledger delta entries
+
+Vault operations produce several ledger delta types:
+
+```
+vaultCreate          — vault creation event
+vault                — general vault operation
+vaultDeposit         — deposit into vault
+vaultWithdraw        — withdrawal from vault
+vaultDistribution    — earnings distribution
+vaultLeaderCommission — leader commission payment
+requestedUsd         — requested USD amount
+closingCost          — cost of closing positions for withdrawal
+basis                — cost basis tracking
+netWithdrawnUsd      — net withdrawn amount
+leverageType         — leverage configuration
+liquidatedPositions  — positions liquidated during vault operations
+```
+
+## Governance
+
+Vault parameter changes go through the standard governance voting process. Validators vote on `VaultModification` proposals through `VoteGlobalAction`.
+
+<Warning>
+Vault withdrawals can trigger order cancellations and position closures. During volatile markets, large withdrawals may experience slippage from forced position closure.
+</Warning>

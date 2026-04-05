@@ -181,6 +181,17 @@ The `sub_account_to_master` mapping tracks which master address owns each sub-ac
 
 Spot transfers include fields for `token`, `amount`, and `destination` (target sub-account address).
 
+### Sub-account transfers
+
+Two transfer types are available:
+
+| Action | Description |
+|--------|-------------|
+| `subAccountTransfer` | Transfer USDC between master and sub-accounts |
+| `subAccountSpotTransfer` | Transfer spot tokens between master and sub-accounts |
+
+The `sub_account_tracker` at the exchange state level manages the relationship between master accounts and their sub-accounts, tracking permissions and transfer history.
+
 ### Sub-Account State
 
 The API returns sub-account data within clearinghouse state:
@@ -198,6 +209,16 @@ Sub-account tracking fields:
 | `sub_accounts` | List of sub-accounts for a user |
 | `subAccountUser.master` | The master/parent address |
 | `subAccountUser.isCross` | Whether this is a cross-margin sub-account |
+
+## Multi-signature accounts
+
+HyperLiquid supports native multi-signature accounts at the L1 level through `ConvertToMultiSigUser`. Once converted, the account requires multiple signers to authorize actions.
+
+The protocol tracks multi-sig state through a `multi_sig_tracker` at the top level of the exchange state. Multi-sig accounts can participate in all standard operations (trading, transfers, governance) with the additional requirement of collecting sufficient signatures.
+
+<Warning>
+Converting to a multi-sig account is a significant operation. Ensure all intended signers are configured correctly before conversion.
+</Warning>
 
 ## Agent Authorization
 

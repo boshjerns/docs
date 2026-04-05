@@ -237,6 +237,42 @@ StakeDiscountTiers:
 
 Higher stake amounts unlock progressively better fee discounts. The `weigh_spot_volume_double` field gives additional weight to spot trading volume when calculating tier eligibility.
 
+## Validator economics
+
+### Staking requirements
+
+Validators must meet minimum self-delegation requirements to participate in consensus. The `self_delegation_requirement` field in the staking state defines this threshold. Self-delegated stake has a **1-year lock period**, ensuring long-term alignment.
+
+### Unstaking
+
+Stake withdrawals enter a **7-day unstaking queue** via `pending_withdrawals`. During this period, the stake continues to count toward security but the validator cannot access the funds.
+
+### Reward formula
+
+Validator rewards come from the `native_token_reserve` (HYPE allocation). The reward rate is **inversely proportional to the square root of total HYPE staked**:
+
+```
+reward_rate ∝ 1 / √(total_staked)
+```
+
+This creates a natural equilibrium: as more HYPE is staked, the per-token yield decreases, discouraging excessive concentration while maintaining sufficient security incentives.
+
+### Commission
+
+Validators set their commission rate via `commission_bps` (basis points). Commission is taken from delegator rewards before distribution. Validators can also:
+- Block new delegations (`delegations_blocked`)
+- Fully disable delegations (`delegations_disabled`)
+- Rotate their signer key (`last_signer_change_time` tracks this)
+
+### Revenue streams
+
+Validators earn from multiple sources:
+1. **Block rewards** -- from the native token reserve
+2. **Commission** -- percentage of delegator rewards
+3. **Fee share** -- portion of trading fees
+
+The two-phase reward system (staging then distribution) ensures atomic, consistent payouts across the validator set.
+
 ## Delayed actions
 
 Governance actions can be delayed for safety. This provides a window for validators to review and potentially cancel dangerous parameter changes before they take effect.

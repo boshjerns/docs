@@ -1,0 +1,101 @@
+---
+title: "Liquidation"
+sidebarTitle: "Liquidation"
+description: "Perpetual liquidation mechanics, partial liquidation, backstop system, insurance fund, and liquidator incentives."
+icon: "triangle-exclamation"
+---
+
+HyperLiquid's liquidation system protects the exchange from bad debt through a multi-layered approach: partial liquidation to minimize market impact, a backstop system as a safety net, and rate limiting to prevent cascading failures.
+
+## Liquidation triggers
+
+Liquidation occurs when a position's margin falls below the maintenance margin requirement. The mark price (derived from the oracle system) is used for liquidation checks, not the last traded price.
+
+Key factors:
+- **Initial margin** = position_size × mark_price / leverage
+- **Maintenance margin** = approximately half of initial margin at maximum leverage
+- Positions with the highest effective leverage are liquidated first
+
+## Partial liquidation
+
+Rather than closing an entire position at once, HyperLiquid preferentially uses partial liquidation to reduce positions incrementally.
+
+A `partial_liquidation_cooldown` prevents rapid repeated partial liquidations from destabilizing a position or cascading through the market. This cooldown is enforced at the protocol level within the application state.
+
+## Allowed liquidators
+
+The protocol maintains an `allowed_liquidators` set — addresses specifically authorized to execute liquidations. This is stored at the exchange state level alongside the order books.
+
+Liquidators receive an incentive for executing liquidations, compensating them for the risk and capital required to absorb liquidated positions.
+
+## TWAP liquidation
+
+For large positions, liquidation can execute through TWAP (Time-Weighted Average Price) orders to minimize market impact:
+
+- The liquidation is split into time-weighted slices
+- Each slice has a `size_increment` controlling the amount per window
+- Orders carry standard book order properties (timestamp, size, reduce-only, time-in-force)
+- The TWAP window updates track cumulative progress
+
+This approach is critical for large positions where an immediate market dump would cause excessive slippage and trigger cascading liquidations in other positions.
+
+## Backstop liquidation
+
+When standard liquidation mechanisms are insufficient, a backstop system provides a safety net:
+
+```
+BackstopLiquidator:
+  mode        — operating mode (multiple modes available)
+  params      — global backstop parameters
+
+BackstopLiquidatorTokenParams:
+  asset       — token asset identifier
+  cloid       — client order ID for tracking
+```
+
+HIP-3 deployed tokens have their own dedicated backstop liquidator with separate parameters and modes, ensuring third-party token liquidations do not impact core markets:
+
+```
+Hip3BackstopLiquidatorMode    — separate mode for HIP-3 tokens
+Hip3BackstopLiquidatorParams  — separate parameters for HIP-3
+```
+
+Backstop parameters are governed through `VoteGlobalAction::SetHip3BackstopLiquidatorParams`.
+
+## Liquidation in the execution pipeline
+
+Liquidation processing runs as a periodic background task within a fixed execution sequence:
+
+```
+update_funding_rates → refresh_hip3 → apply_bole_liquidations
+```
+
+This ordering ensures:
+1. Funding rate changes (which affect margin levels) are applied first
+2. HIP-3 oracle prices are refreshed
+3. Then liquidation checks run with up-to-date margin calculations
+
+## Lending (BOLE) liquidation
+
+The borrow/lend system has its own three-tier liquidation system (documented in detail on the [Lending page](/research/lending)):
+
+| Mode | Description |
+|------|-------------|
+| Market liquidation | Immediate market-order liquidation |
+| Backstop liquidation | Safety net via designated liquidators |
+| Partial liquidation | Incremental position reduction |
+
+BOLE liquidations also execute through TWAP orders to minimize market impact on lending pool positions.
+
+## Safety mechanisms
+
+Several protocol-level guards prevent liquidation cascades:
+
+| Guard | Purpose |
+|-------|---------|
+| `partial_liquidation_cooldown` | Minimum time between partial liquidations |
+| `max_order_distance_from_anchor` | Prevents liquidation orders at extreme prices |
+| `cancel_aggressive_orders_at_open_interest_cap_guard` | Auto-cancels aggressive orders near OI cap |
+| `post_only_until_time` | Can enforce post-only mode during volatile periods |
+
+These guards work together to ensure liquidations execute in an orderly fashion even during extreme market conditions.

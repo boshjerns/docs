@@ -157,3 +157,47 @@ Each block produces execution data including:
 | `node_order_statuses` | Order status updates |
 
 These outputs are available through the streaming API for real-time order book reconstruction.
+
+## TWAP Engine
+
+HyperLiquid includes a native TWAP (Time-Weighted Average Price) engine for executing large orders over time. TWAP is used both by users directly (`twapOrder`/`twapCancel` actions) and internally by the liquidation system.
+
+### TWAP State
+
+```
+TwapState:
+  asset           — asset being traded
+  isBuy           — direction
+  params          — execution parameters
+  slices          — individual execution slices
+
+TwapSchedule:
+  start_time      — execution start
+  duration        — total duration (max 1,440 minutes / 24 hours)
+  randomize       — add jitter to slice timing (reduces predictability)
+```
+
+### Execution
+
+Each TWAP order is split into time-weighted slices. The `WindowUpdate` tracks progress:
+
+```
+WindowUpdate:
+  size_increment  — amount to execute in current window
+```
+
+Slices execute as regular limit or market orders. If a slice cannot fill within its window, it carries forward to the next window.
+
+### Constraints
+
+| Parameter | Value |
+|-----------|-------|
+| Maximum duration | 1,440 minutes (24 hours) |
+| Randomization | Optional jitter on slice timing |
+| Reduce-only | Supported |
+
+TWAP orders produce `node_twap_statuses` in each block's execution data, and fills appear as `UserTwapSliceFills` in the indexer.
+
+<Note>
+TWAP is also used by the BOLE lending system for liquidations, where large positions are unwound gradually to minimize market impact. See [Lending](/research/lending) and [Liquidation](/research/liquidation) for details.
+</Note>
