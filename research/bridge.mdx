@@ -98,7 +98,7 @@ Withdrawals move assets from HyperLiquid L1 to Arbitrum. The process includes a 
     Each validator submits a `ValidatorSignWithdrawalAction` containing the `destination` address, `usd` amount, and `nonce`.
   </Step>
   <Step title="Finalization votes">
-    Validators vote on the finalized Ethereum transaction via `VoteEthFinalizedWithdrawalAction`, which includes the `ethTxHash` of the L1 settlement transaction.
+    Validators vote on the finalized Arbitrum transaction via `VoteEthFinalizedWithdrawalAction`, which includes the `ethTxHash` of the settlement transaction.
   </Step>
   <Step title="Withdrawal complete">
     Once quorum is reached, the withdrawal is marked as `WithdrawalFinalized` and recorded in `finished_withdrawal_to_time`. Funds arrive on Arbitrum.
