@@ -1,7 +1,7 @@
 ---
 title: "Bridge"
 sidebarTitle: "Bridge"
-description: "L1 to Ethereum bridge mechanics. Deposit flow, withdrawal flow, validator set updates, and bridge state management."
+description: "L1 to Arbitrum bridge mechanics. Deposit flow, withdrawal flow, validator set updates, and bridge state management."
 icon: "bridge"
 ---
 
@@ -60,7 +60,7 @@ This uniquely identifies any event on Ethereum that the bridge needs to process.
 
 ## Deposit flow
 
-Deposits move assets from Ethereum to HyperLiquid L1. The flow requires validator quorum before crediting the user.
+Deposits move assets from Arbitrum to HyperLiquid L1. The flow requires validator quorum before crediting the user.
 
 <Steps>
   <Step title="Ethereum deposit detected">
@@ -101,7 +101,7 @@ Withdrawals move assets from HyperLiquid L1 to Arbitrum. The process includes a 
     Validators vote on the finalized Ethereum transaction via `VoteEthFinalizedWithdrawalAction`, which includes the `ethTxHash` of the L1 settlement transaction.
   </Step>
   <Step title="Withdrawal complete">
-    Once quorum is reached, the withdrawal is marked as `WithdrawalFinalized` and recorded in `finished_withdrawal_to_time`. Funds arrive on Ethereum.
+    Once quorum is reached, the withdrawal is marked as `WithdrawalFinalized` and recorded in `finished_withdrawal_to_time`. Funds arrive on Arbitrum.
   </Step>
 </Steps>
 
