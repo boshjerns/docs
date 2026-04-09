@@ -21,13 +21,19 @@
             ]
           },
           {
-            "group": "API Reference",
+            "group": "WebSocket API",
             "pages": [
               "api/connection",
               "api/authentication",
               "api/subscriptions",
               "api/filters",
-              "api/events",
+              "api/events"
+            ]
+          },
+          {
+            "group": "REST API",
+            "pages": [
+              "api/rest",
               "api/endpoints"
             ]
           },
