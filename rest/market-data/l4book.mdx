@@ -1,0 +1,42 @@
+---
+title: "L4 Orderbook"
+openapi: "GET /api/l4book"
+---
+
+L4 orderbook with individual orders attributed to specific maker addresses. **Unique to hypernode.**
+
+Each level shows the L2 total size (`sz`), individual orders attributed to specific addresses (`orders`), and the unattributed remainder (`anonymous_sz`).
+
+`coverage_pct` is the percentage of the book where individual maker addresses are known. Coverage grows over time as the book turns over.
+
+## Example
+
+```bash
+curl "https://hyper.polynode.dev/api/l4book?asset=DOGE"
+```
+
+```json
+{
+  "asset": "DOGE",
+  "bids": [
+    {
+      "px": "0.43021",
+      "sz": "12340",
+      "n": 4,
+      "orders": [
+        { "user": "0x9d705164...", "size": 5000, "oid": 375092088242 },
+        { "user": "0xd071d6d6...", "size": 3000, "oid": 375092088243 }
+      ],
+      "anonymous_sz": "4340"
+    }
+  ],
+  "asks": [],
+  "coverage_pct": 100.0,
+  "tracked_orders": 412,
+  "l2_updated_at": 1775702972409
+}
+```
+
+## Coverage by asset
+
+Smaller assets (DOGE, XRP, HYPE, SOL) typically reach 100% coverage within minutes. Deep books like BTC and ETH show partial coverage that grows over time as the active book turns over.

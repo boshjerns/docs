@@ -1,0 +1,33 @@
+---
+title: "All Assets"
+openapi: "GET /api/assets"
+---
+
+Metadata for all 519 tradeable assets (229 perps + 290 spot pairs).
+
+Asset IDs follow HyperLiquid's convention: `0+` for perps, `10000+` for spot pairs, `110000+` and higher for spot margin variants, `1900000+` for HIP-4 prediction outcomes.
+
+## Example
+
+```bash
+curl https://hyper.polynode.dev/api/assets
+```
+
+```json
+[
+  {
+    "name": "BTC",
+    "asset_id": 0,
+    "sz_decimals": 5,
+    "max_leverage": 40,
+    "market_type": "perp"
+  },
+  {
+    "name": "PURR/USDC",
+    "asset_id": 10000,
+    "sz_decimals": 0,
+    "max_leverage": 0,
+    "market_type": "spot"
+  }
+]
+```

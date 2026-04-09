@@ -1,0 +1,37 @@
+---
+title: "Account State"
+openapi: "GET /api/user"
+---
+
+Full clearinghouse state for a wallet — positions, margin, leverage, unrealized PnL.
+
+## Example
+
+```bash
+curl "https://hyper.polynode.dev/api/user?address=0xc64cc00b46150e9274d09efc945c951710c4ef02"
+```
+
+```json
+{
+  "marginSummary": {
+    "accountValue": "12453.78",
+    "totalNtlPos": "8721.34",
+    "totalRawUsd": "3732.44",
+    "totalMarginUsed": "872.13"
+  },
+  "assetPositions": [
+    {
+      "type": "oneWay",
+      "position": {
+        "coin": "BTC",
+        "szi": "0.05",
+        "entryPx": "70850.0",
+        "leverage": { "type": "cross", "value": 5 },
+        "unrealizedPnl": "9.55"
+      }
+    }
+  ],
+  "withdrawable": "3000.00",
+  "time": 1775702972409
+}
+```

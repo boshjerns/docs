@@ -1,0 +1,29 @@
+---
+title: "L4 Book Stats"
+openapi: "GET /api/l4stats"
+---
+
+Statistics about the L4 book manager — total tracked orders, bootstrap status, cancel resolution rates.
+
+## Example
+
+```bash
+curl https://hyper.polynode.dev/api/l4stats
+```
+
+```json
+{
+  "total_tracked": 114914,
+  "bootstrapped_users": 1384,
+  "active_users_seen": 354341,
+  "oid_index": 114914,
+  "cloid_index": 86427,
+  "orders_bootstrapped": 32182,
+  "orders_added_gossip": 122819,
+  "orders_updated_modify": 458,
+  "orders_removed_cancel_oid": 7605,
+  "orders_removed_cancel_cloid": 300,
+  "cancels_oid_miss": 916499,
+  "cancels_cloid_miss": 1385747
+}
+```

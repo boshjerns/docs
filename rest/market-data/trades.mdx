@@ -1,0 +1,32 @@
+---
+title: "Recent Trades"
+openapi: "GET /api/trades"
+---
+
+Recent fills for a single asset.
+
+`side` is `B` for buy aggressor, `A` for sell aggressor. `users` contains both maker and taker addresses.
+
+## Example
+
+```bash
+curl "https://hyper.polynode.dev/api/trades?asset=BTC&limit=10"
+```
+
+```json
+[
+  {
+    "coin": "BTC",
+    "side": "B",
+    "px": "71041.5",
+    "sz": "0.0007",
+    "time": 1775702972409,
+    "hash": "0x426a997c3574d5a343e40438b7e64202017d0061d077f475e63344cef478af8d",
+    "tid": 1099957769785331,
+    "users": [
+      "0x40cc85e70197c641fd5f38d10ac5c1924b17cc5c",
+      "0x9d1eb5f9121e78faa5455d1b51cbf1a0c6e8340c"
+    ]
+  }
+]
+```

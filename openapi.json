@@ -1,0 +1,739 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "hypernode API",
+    "description": "Real-time HyperLiquid L1 streaming and snapshot API. WebSocket for pre-consensus action streams, REST for current market state and account data.",
+    "contact": {
+      "name": "hypernode",
+      "url": "https://hyper.polynode.dev"
+    },
+    "version": "1.0.0"
+  },
+  "servers": [
+    {
+      "url": "https://hyper.polynode.dev",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    { "ApiKeyQuery": [] },
+    { "ApiKeyHeader": [] }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Health check",
+        "description": "Liveness probe. Returns 200 OK if the service is running.",
+        "operationId": "health",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service is alive",
+            "content": {
+              "text/plain": {
+                "schema": { "type": "string", "example": "ok" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/status": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Service status",
+        "description": "Current network, block height, throughput, and connection counts.",
+        "operationId": "status",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Service status",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/Status" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": ["System"],
+        "summary": "Service metrics",
+        "description": "Detailed metrics including action throughput, broadcast counts, peer info.",
+        "operationId": "metrics",
+        "security": [],
+        "responses": { "200": { "description": "Metrics JSON" } }
+      }
+    },
+    "/api/prices": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "All mid prices",
+        "description": "Returns mid prices for every tradeable asset on HyperLiquid (perps + spot pairs + variants). Updated every 2 seconds.",
+        "operationId": "get_prices",
+        "responses": {
+          "200": {
+            "description": "Map of asset name to mid price",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": { "type": "string" },
+                  "example": {
+                    "BTC": "71041.5",
+                    "ETH": "2180.15",
+                    "HYPE": "38.4785",
+                    "SOL": "82.2065"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/orderbook": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "L2 orderbook",
+        "description": "Returns the L2 orderbook for a single asset. Top 20 levels per side. Bids descending, asks ascending.",
+        "operationId": "get_orderbook",
+        "parameters": [
+          {
+            "name": "asset",
+            "in": "query",
+            "required": true,
+            "description": "Asset name (BTC, ETH, HYPE, etc.)",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Orderbook snapshot",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/L2Book" }
+              }
+            }
+          },
+          "400": { "description": "Missing asset parameter" },
+          "404": { "description": "Asset not found" }
+        }
+      }
+    },
+    "/api/l4book": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "L4 orderbook with maker addresses",
+        "description": "Returns the L4 orderbook with individual orders attributed to specific maker addresses. Each level shows the L2 total size, individual orders with addresses, and the unattributed remainder. Unique to hypernode — built from pre-consensus data.",
+        "operationId": "get_l4book",
+        "parameters": [
+          {
+            "name": "asset",
+            "in": "query",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "L4 book snapshot",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/L4Book" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/l4stats": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "L4 book statistics",
+        "description": "Returns statistics about the L4 book manager: total tracked orders, bootstrap status, cancel resolution rates.",
+        "operationId": "get_l4stats",
+        "responses": { "200": { "description": "L4 stats" } }
+      }
+    },
+    "/api/tickers": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "All tickers",
+        "description": "Compact ticker for every asset — best bid/offer, mark, last, 24h volume, 24h change. Lighter than per-asset orderbook calls. Use this for dashboards showing all markets at once.",
+        "operationId": "get_tickers",
+        "responses": {
+          "200": {
+            "description": "Array of tickers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Ticker" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stats": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "24h statistics",
+        "description": "24h volume and price change for every asset.",
+        "operationId": "get_stats",
+        "responses": {
+          "200": {
+            "description": "Array of 24h stats",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Stats24h" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/funding": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "All funding rates",
+        "description": "Funding rates and open interest for all 229 perpetuals. Funding rate is per-hour.",
+        "operationId": "get_funding",
+        "responses": {
+          "200": {
+            "description": "Array of funding info",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/FundingInfo" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/openInterest": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "Open interest rankings",
+        "description": "Open interest for all perpetuals.",
+        "operationId": "get_open_interest",
+        "responses": { "200": { "description": "Open interest array" } }
+      }
+    },
+    "/api/predictedFundings": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "Predicted next funding rates",
+        "description": "Predicted funding rates for the next funding interval per asset.",
+        "operationId": "get_predicted_fundings",
+        "responses": { "200": { "description": "Predicted fundings" } }
+      }
+    },
+    "/api/fundingHistory": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "Historical funding rates",
+        "description": "Historical funding rates for a single asset over a time window.",
+        "operationId": "get_funding_history",
+        "parameters": [
+          { "name": "asset", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "from", "in": "query", "required": false, "description": "Start time in ms", "schema": { "type": "integer" } },
+          { "name": "to", "in": "query", "required": false, "description": "End time in ms", "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "Funding history array" } }
+      }
+    },
+    "/api/trades": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "Recent trades",
+        "description": "Recent fills for a single asset.",
+        "operationId": "get_trades",
+        "parameters": [
+          { "name": "asset", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "limit", "in": "query", "required": false, "description": "Max fills (default 100, max 1000)", "schema": { "type": "integer", "default": 100, "maximum": 1000 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Array of fills",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Fill" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/candles": {
+      "get": {
+        "tags": ["Market Data"],
+        "summary": "OHLCV candles",
+        "description": "OHLCV candles for a single asset and interval.",
+        "operationId": "get_candles",
+        "parameters": [
+          { "name": "asset", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "interval", "in": "query", "required": false, "description": "1m, 5m, 15m, 1h, 4h, 1d", "schema": { "type": "string", "default": "1m", "enum": ["1m", "5m", "15m", "1h", "4h", "1d"] } },
+          { "name": "limit", "in": "query", "required": false, "schema": { "type": "integer", "default": 500, "maximum": 1000 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Candles array",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Candle" } }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user": {
+      "get": {
+        "tags": ["User Data"],
+        "summary": "Account state",
+        "description": "Full clearinghouse state for a wallet — positions, margin, leverage, PnL.",
+        "operationId": "get_user",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "description": "Wallet address (0x + 40 hex chars)", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "User clearinghouse state" } }
+      }
+    },
+    "/api/openOrders": {
+      "get": {
+        "tags": ["User Data"],
+        "summary": "User open orders",
+        "description": "Currently resting orders for a user.",
+        "operationId": "get_open_orders",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Open orders array" } }
+      }
+    },
+    "/api/userFills": {
+      "get": {
+        "tags": ["User Data"],
+        "summary": "User fill history",
+        "description": "Recent fills for a user.",
+        "operationId": "get_user_fills",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "User fills array" } }
+      }
+    },
+    "/api/userFunding": {
+      "get": {
+        "tags": ["User Data"],
+        "summary": "User funding payments",
+        "description": "Funding payments received and paid by the user.",
+        "operationId": "get_user_funding",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "from", "in": "query", "required": false, "schema": { "type": "integer" } },
+          { "name": "to", "in": "query", "required": false, "schema": { "type": "integer" } }
+        ],
+        "responses": { "200": { "description": "User funding history" } }
+      }
+    },
+    "/api/userVaults": {
+      "get": {
+        "tags": ["User Data"],
+        "summary": "User vault deposits",
+        "description": "Vault deposits and equity positions for the user.",
+        "operationId": "get_user_vaults",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "User vault equities" } }
+      }
+    },
+    "/api/userStaking": {
+      "get": {
+        "tags": ["User Data"],
+        "summary": "User staking positions",
+        "description": "Staking delegations and rewards for the user.",
+        "operationId": "get_user_staking",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Delegation summary" } }
+      }
+    },
+    "/api/userReferrals": {
+      "get": {
+        "tags": ["User Data"],
+        "summary": "User referrals",
+        "description": "Referral code, referees, and earnings for the user.",
+        "operationId": "get_user_referrals",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Referral data" } }
+      }
+    },
+    "/api/subAccounts": {
+      "get": {
+        "tags": ["User Data"],
+        "summary": "User sub-accounts",
+        "description": "Sub-accounts owned by the wallet.",
+        "operationId": "get_sub_accounts",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Sub-accounts array" } }
+      }
+    },
+    "/api/portfolio": {
+      "get": {
+        "tags": ["User Data"],
+        "summary": "Portfolio history",
+        "description": "Historical portfolio value over time.",
+        "operationId": "get_portfolio",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Portfolio history" } }
+      }
+    },
+    "/api/userFees": {
+      "get": {
+        "tags": ["User Data"],
+        "summary": "User fee structure",
+        "description": "Fee structure and rates applied to the user.",
+        "operationId": "get_user_fees",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "User fees" } }
+      }
+    },
+    "/api/spotState": {
+      "get": {
+        "tags": ["User Data"],
+        "summary": "Spot account state",
+        "description": "Spot clearinghouse state for the user.",
+        "operationId": "get_spot_state",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Spot account state" } }
+      }
+    },
+    "/api/assets": {
+      "get": {
+        "tags": ["Discovery"],
+        "summary": "All asset metadata",
+        "description": "Metadata for all 519 tradeable assets (229 perps + 290 spot pairs).",
+        "operationId": "get_assets",
+        "responses": {
+          "200": {
+            "description": "Array of asset metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/AssetMeta" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/spotPairs": {
+      "get": {
+        "tags": ["Discovery"],
+        "summary": "Spot trading pairs",
+        "description": "All spot trading pairs (filtered subset of /api/assets).",
+        "operationId": "get_spot_pairs",
+        "responses": { "200": { "description": "Spot pairs array" } }
+      }
+    },
+    "/api/predictionMarkets": {
+      "get": {
+        "tags": ["Prediction Markets"],
+        "summary": "All prediction markets",
+        "description": "All HIP-4 prediction markets and questions with outcomes, descriptions, and resolution status.",
+        "operationId": "get_prediction_markets",
+        "responses": { "200": { "description": "Prediction markets" } }
+      }
+    },
+    "/api/predictionMarket": {
+      "get": {
+        "tags": ["Prediction Markets"],
+        "summary": "Single prediction market",
+        "description": "Details for a single prediction market by question ID.",
+        "operationId": "get_prediction_market",
+        "parameters": [
+          { "name": "id", "in": "query", "required": true, "description": "Question ID", "schema": { "type": "integer" } }
+        ],
+        "responses": {
+          "200": { "description": "Prediction market details" },
+          "404": { "description": "Market not found" }
+        }
+      }
+    },
+    "/api/vaults": {
+      "get": {
+        "tags": ["Vaults & Governance"],
+        "summary": "All vaults",
+        "description": "Active vaults metadata.",
+        "operationId": "get_vaults",
+        "responses": { "200": { "description": "Vaults array" } }
+      }
+    },
+    "/api/vault": {
+      "get": {
+        "tags": ["Vaults & Governance"],
+        "summary": "Single vault details",
+        "operationId": "get_vault",
+        "parameters": [
+          { "name": "address", "in": "query", "required": true, "description": "Vault address", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "description": "Vault details" } }
+      }
+    },
+    "/api/validators": {
+      "get": {
+        "tags": ["Vaults & Governance"],
+        "summary": "Active validators",
+        "description": "Active validator set with stake, name, signer address.",
+        "operationId": "get_validators",
+        "responses": {
+          "200": {
+            "description": "Validators array",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Validator" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/proposals": {
+      "get": {
+        "tags": ["Vaults & Governance"],
+        "summary": "Active proposals",
+        "description": "Active governance proposals.",
+        "operationId": "get_proposals",
+        "responses": { "200": { "description": "Proposals array" } }
+      }
+    },
+    "/api/perpAuction": {
+      "get": {
+        "tags": ["Discovery"],
+        "summary": "Perp deploy auction",
+        "description": "Status of the perpetual deploy dutch auction.",
+        "operationId": "get_perp_auction",
+        "responses": { "200": { "description": "Perp auction status" } }
+      }
+    },
+    "/api/spotAuction": {
+      "get": {
+        "tags": ["Discovery"],
+        "summary": "Spot deploy auction",
+        "description": "Status of the spot pair deploy dutch auction.",
+        "operationId": "get_spot_auction",
+        "responses": { "200": { "description": "Spot auction status" } }
+      }
+    },
+    "/api/info": {
+      "post": {
+        "tags": ["Passthrough"],
+        "summary": "Generic HL info passthrough",
+        "description": "Generic passthrough that accepts any HyperLiquid info request body. Use this for any query type not covered by the dedicated endpoints. The request body is forwarded as-is.",
+        "operationId": "post_info",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "example": { "type": "userRateLimit", "user": "0xc64cc00b46150e9274d09efc945c951710c4ef02" }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "HL info response (forwarded as-is)" },
+          "502": { "description": "Upstream error" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ApiKeyQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "key"
+      },
+      "ApiKeyHeader": {
+        "type": "http",
+        "scheme": "bearer"
+      }
+    },
+    "schemas": {
+      "Status": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "example": "ok" },
+          "network": { "type": "string", "example": "mainnet" },
+          "block": { "type": "integer", "example": 70835238 },
+          "actions_per_sec": { "type": "integer", "example": 2398 },
+          "uptime_seconds": { "type": "integer", "example": 547 },
+          "ws_connections": { "type": "integer" },
+          "ws_subscriptions": { "type": "integer" }
+        }
+      },
+      "PriceLevel": {
+        "type": "object",
+        "properties": {
+          "px": { "type": "string", "description": "Price" },
+          "sz": { "type": "string", "description": "Aggregate size at this level" },
+          "n": { "type": "integer", "description": "Number of resting orders" }
+        }
+      },
+      "L2Book": {
+        "type": "object",
+        "properties": {
+          "asset": { "type": "string" },
+          "bids": { "type": "array", "items": { "$ref": "#/components/schemas/PriceLevel" } },
+          "asks": { "type": "array", "items": { "$ref": "#/components/schemas/PriceLevel" } },
+          "updated_at": { "type": "integer" }
+        }
+      },
+      "L4Order": {
+        "type": "object",
+        "properties": {
+          "user": { "type": "string", "description": "Maker wallet address" },
+          "size": { "type": "number" },
+          "oid": { "type": "integer", "description": "Order ID" }
+        }
+      },
+      "L4Level": {
+        "type": "object",
+        "properties": {
+          "px": { "type": "string" },
+          "sz": { "type": "string", "description": "L2 total size" },
+          "n": { "type": "integer", "description": "Number of attributed orders" },
+          "orders": { "type": "array", "items": { "$ref": "#/components/schemas/L4Order" } },
+          "anonymous_sz": { "type": "string", "description": "Unattributed remainder" }
+        }
+      },
+      "L4Book": {
+        "type": "object",
+        "properties": {
+          "asset": { "type": "string" },
+          "bids": { "type": "array", "items": { "$ref": "#/components/schemas/L4Level" } },
+          "asks": { "type": "array", "items": { "$ref": "#/components/schemas/L4Level" } },
+          "coverage_pct": { "type": "number", "description": "Percentage of book attributed to specific addresses" },
+          "tracked_orders": { "type": "integer" },
+          "l2_updated_at": { "type": "integer" }
+        }
+      },
+      "Ticker": {
+        "type": "object",
+        "properties": {
+          "asset": { "type": "string" },
+          "mid": { "type": "string" },
+          "bid": { "type": "string" },
+          "ask": { "type": "string" },
+          "mark": { "type": "string" },
+          "oracle": { "type": "string" },
+          "last": { "type": "string" },
+          "day_volume": { "type": "string" },
+          "day_change_pct": { "type": "number" },
+          "open_interest": { "type": "string" },
+          "funding_rate": { "type": "string" },
+          "updated_at": { "type": "integer" }
+        }
+      },
+      "Stats24h": {
+        "type": "object",
+        "properties": {
+          "asset": { "type": "string" },
+          "volume_usd": { "type": "string" },
+          "change_pct": { "type": "number" },
+          "mark": { "type": "string" },
+          "prev_day_px": { "type": "string" },
+          "updated_at": { "type": "integer" }
+        }
+      },
+      "FundingInfo": {
+        "type": "object",
+        "properties": {
+          "asset": { "type": "string" },
+          "funding_rate": { "type": "string", "description": "Per-hour funding rate" },
+          "open_interest": { "type": "string" },
+          "mark_price": { "type": "string" },
+          "oracle_price": { "type": "string" },
+          "premium": { "type": "string" },
+          "updated_at": { "type": "integer" }
+        }
+      },
+      "Fill": {
+        "type": "object",
+        "properties": {
+          "coin": { "type": "string" },
+          "side": { "type": "string", "description": "B = buy aggressor, A = sell aggressor" },
+          "px": { "type": "string" },
+          "sz": { "type": "string" },
+          "time": { "type": "integer" },
+          "hash": { "type": "string" },
+          "tid": { "type": "integer", "description": "Unique trade ID" },
+          "users": { "type": "array", "items": { "type": "string" }, "description": "[maker, taker]" }
+        }
+      },
+      "Candle": {
+        "type": "object",
+        "properties": {
+          "open": { "type": "number" },
+          "high": { "type": "number" },
+          "low": { "type": "number" },
+          "close": { "type": "number" },
+          "volume": { "type": "number" },
+          "timestamp": { "type": "integer", "description": "Start of interval bucket in ms" },
+          "trades": { "type": "integer" }
+        }
+      },
+      "AssetMeta": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "asset_id": { "type": "integer" },
+          "sz_decimals": { "type": "integer" },
+          "max_leverage": { "type": "integer" },
+          "market_type": { "type": "string", "enum": ["perp", "spot"] }
+        }
+      },
+      "Validator": {
+        "type": "object",
+        "properties": {
+          "signer": { "type": "string" },
+          "name": { "type": "string" },
+          "blocks_proposed": { "type": "integer" },
+          "last_seen": { "type": "integer" }
+        }
+      }
+    }
+  }
+}

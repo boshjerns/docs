@@ -1,0 +1,29 @@
+---
+title: "L2 Orderbook"
+openapi: "GET /api/orderbook"
+---
+
+Returns the L2 orderbook for a single asset.
+
+Top 20 levels per side. Each level has `px` (price), `sz` (aggregate size), and `n` (number of resting orders at that level). Bids are sorted descending, asks ascending.
+
+## Example
+
+```bash
+curl "https://hyper.polynode.dev/api/orderbook?asset=BTC"
+```
+
+```json
+{
+  "asset": "BTC",
+  "bids": [
+    { "px": "71040.0", "sz": "1.23456", "n": 8 },
+    { "px": "71039.0", "sz": "0.87654", "n": 5 }
+  ],
+  "asks": [
+    { "px": "71041.0", "sz": "0.95432", "n": 6 },
+    { "px": "71042.0", "sz": "1.11111", "n": 4 }
+  ],
+  "updated_at": 1775702972409
+}
+```

@@ -1,0 +1,26 @@
+---
+title: "Funding Rates"
+openapi: "GET /api/funding"
+---
+
+Funding rates and open interest for all 229 perpetuals. Funding rate is per-hour.
+
+## Example
+
+```bash
+curl https://hyper.polynode.dev/api/funding
+```
+
+```json
+[
+  {
+    "asset": "BTC",
+    "funding_rate": "0.0000125",
+    "open_interest": "26361.336",
+    "mark_price": "71041.5",
+    "oracle_price": "71040.8",
+    "premium": "0.0000098",
+    "updated_at": 1775702972409
+  }
+]
+```

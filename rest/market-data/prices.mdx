@@ -1,0 +1,26 @@
+---
+title: "All Prices"
+openapi: "GET /api/prices"
+---
+
+Returns mid prices for every tradeable asset on HyperLiquid (perps + spot pairs + variants).
+
+Updated every 2 seconds. Includes all 537 assets.
+
+## Example
+
+```bash
+curl https://hyper.polynode.dev/api/prices
+```
+
+```json
+{
+  "BTC": "71041.5",
+  "ETH": "2180.15",
+  "HYPE": "38.4785",
+  "SOL": "82.2065",
+  "DOGE": "0.43021"
+}
+```
+
+The response is a flat object mapping asset name to mid price string.

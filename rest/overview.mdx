@@ -1,0 +1,51 @@
+---
+title: REST API Overview
+description: Snapshot endpoints for HyperLiquid market state, user data, and discovery
+---
+
+The hypernode REST API returns JSON snapshots of HyperLiquid state. All endpoints are read-only.
+
+**Base URL:** `https://hyper.polynode.dev`
+
+## Categories
+
+<CardGroup cols={2}>
+  <Card title="Market Data" icon="chart-line" href="/rest/market-data/prices">
+    Prices, orderbook, L4 book, trades, candles, funding, tickers, stats
+  </Card>
+  <Card title="User Data" icon="user" href="/rest/user-data/user">
+    Account state, open orders, fills, vault positions, staking, portfolio
+  </Card>
+  <Card title="Discovery" icon="compass" href="/rest/discovery/assets">
+    Assets, spot pairs, validators, vaults, prediction markets, auctions
+  </Card>
+  <Card title="Passthrough" icon="arrow-right-arrow-left" href="/rest/passthrough/info">
+    Generic POST passthrough for any HyperLiquid info query type
+  </Card>
+</CardGroup>
+
+## Authentication
+
+All REST endpoints accept an API key as a query parameter or bearer header:
+
+```bash
+# Query parameter
+curl "https://hyper.polynode.dev/api/prices?key=pn_live_..."
+
+# Or header
+curl -H "Authorization: Bearer pn_live_..." https://hyper.polynode.dev/api/prices
+```
+
+## Response format
+
+All endpoints return JSON with `Content-Type: application/json`. Errors return:
+
+```json
+{ "error": "missing 'asset' parameter" }
+```
+
+with the appropriate HTTP status code (400 for client errors, 502 for upstream errors).
+
+## Rate limits
+
+REST endpoints share API key tier limits. WebSocket subscribers receive updates pushed automatically and don't count against REST quotas. See [Authentication](/api/authentication) for tier details.

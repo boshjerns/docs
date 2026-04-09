@@ -1,0 +1,23 @@
+---
+title: "Validators"
+openapi: "GET /api/validators"
+---
+
+Active validator set with stake, name, and signer address.
+
+## Example
+
+```bash
+curl https://hyper.polynode.dev/api/validators
+```
+
+```json
+[
+  {
+    "signer": "0xdf35aee8ef5658686142acd1e5ab5dbcdf8c51e8",
+    "name": "Hyper Foundation 4",
+    "blocks_proposed": 0,
+    "last_seen": 1775702972409
+  }
+]
+```

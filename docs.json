@@ -3,15 +3,15 @@
   "theme": "mint",
   "name": "hypernode",
   "colors": {
-    "primary": "#3B82F6",
-    "light": "#60A5FA",
-    "dark": "#1D4ED8"
+    "primary": "#22d3ee",
+    "light": "#67e8f9",
+    "dark": "#0891b2"
   },
   "favicon": "/favicon.svg",
   "navigation": {
     "tabs": [
       {
-        "tab": "Documentation",
+        "tab": "Guides",
         "groups": [
           {
             "group": "Getting Started",
@@ -21,20 +21,25 @@
             ]
           },
           {
-            "group": "WebSocket API",
+            "group": "Examples",
+            "pages": [
+              "examples/typescript",
+              "examples/python"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "WebSocket",
+        "groups": [
+          {
+            "group": "Real-time Streaming",
             "pages": [
               "api/connection",
               "api/authentication",
               "api/subscriptions",
               "api/filters",
               "api/events"
-            ]
-          },
-          {
-            "group": "REST API",
-            "pages": [
-              "api/rest",
-              "api/endpoints"
             ]
           },
           {
@@ -47,10 +52,84 @@
             ]
           },
           {
-            "group": "Examples",
+            "group": "System",
             "pages": [
-              "examples/typescript",
-              "examples/python"
+              "api/endpoints"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "REST API",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "rest/overview"
+            ]
+          },
+          {
+            "group": "Market Data",
+            "pages": [
+              "rest/market-data/prices",
+              "rest/market-data/tickers",
+              "rest/market-data/stats",
+              "rest/market-data/orderbook",
+              "rest/market-data/l4book",
+              "rest/market-data/l4stats",
+              "rest/market-data/trades",
+              "rest/market-data/candles",
+              "rest/market-data/funding",
+              "rest/market-data/funding-history",
+              "rest/market-data/predicted-fundings",
+              "rest/market-data/open-interest"
+            ]
+          },
+          {
+            "group": "User Data",
+            "pages": [
+              "rest/user-data/user",
+              "rest/user-data/open-orders",
+              "rest/user-data/user-fills",
+              "rest/user-data/user-funding",
+              "rest/user-data/user-vaults",
+              "rest/user-data/user-staking",
+              "rest/user-data/user-referrals",
+              "rest/user-data/sub-accounts",
+              "rest/user-data/portfolio",
+              "rest/user-data/user-fees",
+              "rest/user-data/spot-state"
+            ]
+          },
+          {
+            "group": "Discovery",
+            "pages": [
+              "rest/discovery/assets",
+              "rest/discovery/spot-pairs",
+              "rest/discovery/perp-auction",
+              "rest/discovery/spot-auction"
+            ]
+          },
+          {
+            "group": "Prediction Markets",
+            "pages": [
+              "rest/predictions/prediction-markets",
+              "rest/predictions/prediction-market"
+            ]
+          },
+          {
+            "group": "Vaults & Governance",
+            "pages": [
+              "rest/governance/vaults",
+              "rest/governance/vault",
+              "rest/governance/validators",
+              "rest/governance/proposals"
+            ]
+          },
+          {
+            "group": "Passthrough",
+            "pages": [
+              "rest/passthrough/info"
             ]
           }
         ]
