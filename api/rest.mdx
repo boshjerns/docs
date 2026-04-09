@@ -275,6 +275,342 @@ Each level shows the L2 total size (`sz`), individual orders attributed to speci
 
 ---
 
+---
+
+## GET /api/tickers
+
+Compact ticker for every asset — best bid/offer, mark, last, 24h volume, 24h change.
+
+**Request:**
+```bash
+curl https://hyper.polynode.dev/api/tickers
+```
+
+**Response:**
+```json
+[
+  {
+    "asset": "BTC",
+    "mid": "71041.5",
+    "bid": "71040.0",
+    "ask": "71041.0",
+    "mark": "71041.5",
+    "oracle": "71040.8",
+    "last": "71041.5",
+    "day_volume": "234567890.12",
+    "day_change_pct": 1.23,
+    "open_interest": "26361.336",
+    "funding_rate": "0.0000125",
+    "updated_at": 1775702972409
+  }
+]
+```
+
+Lighter than `/api/orderbook` — one entry per asset with the essentials. Use this for dashboards showing all markets at once.
+
+---
+
+## GET /api/stats
+
+24h volume and price change for every asset.
+
+**Request:**
+```bash
+curl https://hyper.polynode.dev/api/stats
+```
+
+**Response:**
+```json
+[
+  {
+    "asset": "BTC",
+    "volume_usd": "234567890.12",
+    "change_pct": 1.23,
+    "mark": "71041.5",
+    "prev_day_px": "70180.0",
+    "updated_at": 1775702972409
+  }
+]
+```
+
+---
+
+## GET /api/openInterest
+
+Open interest rankings for all perpetuals.
+
+**Request:**
+```bash
+curl https://hyper.polynode.dev/api/openInterest
+```
+
+**Response:**
+```json
+[
+  {
+    "asset": "BTC",
+    "open_interest": "26361.336",
+    "mark_price": "71041.5"
+  }
+]
+```
+
+---
+
+## GET /api/predictedFundings
+
+Predicted next funding rates for all perpetuals.
+
+**Request:**
+```bash
+curl https://hyper.polynode.dev/api/predictedFundings
+```
+
+Returns the predicted funding rate for the next funding interval per asset.
+
+---
+
+## GET /api/fundingHistory
+
+Historical funding rates for a single asset.
+
+**Query parameters:**
+- `asset` (required) — asset name
+- `from` (optional) — start time in ms (default 0)
+- `to` (optional) — end time in ms
+
+**Request:**
+```bash
+curl "https://hyper.polynode.dev/api/fundingHistory?asset=BTC&from=1775000000000"
+```
+
+---
+
+## GET /api/spotPairs
+
+Spot trading pairs only (filtered subset of `/api/assets`).
+
+**Request:**
+```bash
+curl https://hyper.polynode.dev/api/spotPairs
+```
+
+---
+
+## GET /api/predictionMarkets
+
+All HIP-4 prediction markets and questions.
+
+**Request:**
+```bash
+curl https://hyper.polynode.dev/api/predictionMarkets
+```
+
+Returns the full set of prediction market questions with their outcomes, descriptions, and resolution status.
+
+---
+
+## GET /api/predictionMarket
+
+Single prediction market by ID.
+
+**Query parameters:**
+- `id` (required) — question ID
+
+**Request:**
+```bash
+curl "https://hyper.polynode.dev/api/predictionMarket?id=1"
+```
+
+---
+
+## GET /api/validators
+
+Active validator set with stake, name, and signer address.
+
+**Request:**
+```bash
+curl https://hyper.polynode.dev/api/validators
+```
+
+**Response:**
+```json
+[
+  {
+    "signer": "0xdf35aee8ef5658686142acd1e5ab5dbcdf8c51e8",
+    "name": "Hyper Foundation 4",
+    "blocks_proposed": 0,
+    "last_seen": 1775702972409
+  }
+]
+```
+
+---
+
+## GET /api/vaults
+
+All vaults metadata.
+
+**Request:**
+```bash
+curl https://hyper.polynode.dev/api/vaults
+```
+
+---
+
+## GET /api/vault
+
+Single vault details.
+
+**Query parameters:**
+- `address` (required) — vault address
+
+**Request:**
+```bash
+curl "https://hyper.polynode.dev/api/vault?address=0x..."
+```
+
+---
+
+## GET /api/proposals
+
+Active governance proposals.
+
+**Request:**
+```bash
+curl https://hyper.polynode.dev/api/proposals
+```
+
+---
+
+## GET /api/perpAuction
+
+Status of the perpetual deploy dutch auction.
+
+**Request:**
+```bash
+curl https://hyper.polynode.dev/api/perpAuction
+```
+
+---
+
+## GET /api/spotAuction
+
+Status of the spot pair deploy dutch auction.
+
+**Request:**
+```bash
+curl https://hyper.polynode.dev/api/spotAuction
+```
+
+---
+
+# User-specific endpoints
+
+All user endpoints require an `address` query parameter (42-char hex starting with `0x`).
+
+## GET /api/openOrders
+
+User's currently resting orders.
+
+```bash
+curl "https://hyper.polynode.dev/api/openOrders?address=0x..."
+```
+
+## GET /api/userFills
+
+User's recent fill history.
+
+```bash
+curl "https://hyper.polynode.dev/api/userFills?address=0x..."
+```
+
+## GET /api/userFunding
+
+Funding payments received and paid by the user.
+
+**Query parameters:**
+- `address` (required)
+- `from` (optional) — start time in ms
+- `to` (optional) — end time in ms
+
+```bash
+curl "https://hyper.polynode.dev/api/userFunding?address=0x...&from=1775000000000"
+```
+
+## GET /api/userVaults
+
+Vault deposits and equity positions for the user.
+
+```bash
+curl "https://hyper.polynode.dev/api/userVaults?address=0x..."
+```
+
+## GET /api/userStaking
+
+User's staking delegations and rewards.
+
+```bash
+curl "https://hyper.polynode.dev/api/userStaking?address=0x..."
+```
+
+## GET /api/userReferrals
+
+Referral code, referees, and earnings.
+
+```bash
+curl "https://hyper.polynode.dev/api/userReferrals?address=0x..."
+```
+
+## GET /api/subAccounts
+
+Sub-accounts owned by the wallet.
+
+```bash
+curl "https://hyper.polynode.dev/api/subAccounts?address=0x..."
+```
+
+## GET /api/portfolio
+
+Historical portfolio value over time.
+
+```bash
+curl "https://hyper.polynode.dev/api/portfolio?address=0x..."
+```
+
+## GET /api/userFees
+
+Fee structure and rates applied to the user.
+
+```bash
+curl "https://hyper.polynode.dev/api/userFees?address=0x..."
+```
+
+## GET /api/spotState
+
+Spot account state for the user.
+
+```bash
+curl "https://hyper.polynode.dev/api/spotState?address=0x..."
+```
+
+---
+
+## POST /api/info
+
+Generic passthrough that accepts any HyperLiquid info request body. Use this for any query type not covered by the dedicated endpoints above.
+
+**Request:**
+```bash
+curl -X POST https://hyper.polynode.dev/api/info \
+  -H 'Content-Type: application/json' \
+  -d '{"type": "userRateLimit", "user": "0x..."}'
+```
+
+The request body is forwarded as-is. The response is the JSON returned by HyperLiquid.
+
+---
+
 ## Authentication
 
 Production REST endpoints require an API key passed as a query parameter or header:
