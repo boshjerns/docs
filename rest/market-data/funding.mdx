@@ -3,7 +3,9 @@ title: "Funding Rates"
 openapi: "GET /exchange/funding"
 ---
 
-Funding rates and open interest for all 229 perpetuals. Funding rate is per-hour.
+Returns the full HyperLiquid `metaAndAssetCtxs` response: perpetual metadata and per-asset funding/price/volume context.
+
+The response is a 2-element array: `[0]` is the universe metadata, `[1]` is an array of per-asset context objects.
 
 ## Example
 
@@ -14,13 +16,23 @@ curl https://hyper.polynode.dev/exchange/funding
 ```json
 [
   {
-    "asset": "BTC",
-    "funding_rate": "0.0000125",
-    "open_interest": "26361.336",
-    "mark_price": "71041.5",
-    "oracle_price": "71040.8",
-    "premium": "0.0000098",
-    "updated_at": 1775702972409
-  }
+    "universe": [
+      {"szDecimals": 5, "name": "BTC", "maxLeverage": 40, "marginTableId": 56},
+      {"szDecimals": 4, "name": "ETH", "maxLeverage": 25, "marginTableId": 55}
+    ]
+  },
+  [
+    {
+      "funding": "0.0000125",
+      "openInterest": "26361.336",
+      "oraclePx": "71040.8",
+      "markPx": "71041.5",
+      "midPx": "71041.5",
+      "prevDayPx": "70180.0",
+      "dayNtlVlm": "234567890.12",
+      "premium": "0.0000098",
+      "impactPxs": ["71039.0", "71043.0"]
+    }
+  ]
 ]
 ```

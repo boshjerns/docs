@@ -5,25 +5,37 @@ openapi: "GET /exchange/orderbook"
 
 Returns the L2 orderbook for a single asset.
 
-Top 20 levels per side. Each level has `px` (price), `sz` (aggregate size), and `n` (number of resting orders at that level). Bids are sorted descending, asks ascending.
+Each level has `px` (price), `sz` (aggregate size), and `n` (number of resting orders at that level). `levels[0]` = bids (descending), `levels[1]` = asks (ascending).
 
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/exchange/orderbook?asset=BTC"
+curl "https://hyper.polynode.dev/exchange/orderbook?coin=BTC"
 ```
 
 ```json
 {
-  "asset": "BTC",
-  "bids": [
-    { "px": "71040.0", "sz": "1.23456", "n": 8 },
-    { "px": "71039.0", "sz": "0.87654", "n": 5 }
-  ],
-  "asks": [
-    { "px": "71041.0", "sz": "0.95432", "n": 6 },
-    { "px": "71042.0", "sz": "1.11111", "n": 4 }
-  ],
-  "updated_at": 1775702972409
+  "coin": "BTC",
+  "time": 1776093910691,
+  "levels": [
+    [
+      {"px": "71843.0", "sz": "16.5998", "n": 51},
+      {"px": "71842.0", "sz": "1.16671", "n": 6}
+    ],
+    [
+      {"px": "71844.0", "sz": "12.3456", "n": 38},
+      {"px": "71845.0", "sz": "0.98765", "n": 4}
+    ]
+  ]
 }
 ```
+
+| Field | Description |
+|-------|-------------|
+| `coin` | Asset name |
+| `time` | Timestamp (Unix ms) |
+| `levels[0]` | Bids (descending by price) |
+| `levels[1]` | Asks (ascending by price) |
+| `px` | Price level |
+| `sz` | Total size at this level |
+| `n` | Number of orders at this level |

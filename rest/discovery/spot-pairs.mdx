@@ -1,12 +1,21 @@
 ---
-title: "Spot Pairs"
-openapi: "GET /exchange/spotPairs"
+title: "Spot Assets"
+openapi: "GET /exchange/spot-assets"
 ---
 
-All spot trading pairs (filtered subset of `/exchange/assets`).
+Spot market metadata. Returns the `spotMeta` response from HyperLiquid.
 
 ## Example
 
 ```bash
-curl https://hyper.polynode.dev/exchange/spotPairs
+curl https://hyper.polynode.dev/exchange/spot-assets
+```
+
+```json
+{
+  "universe": [
+    {"tokens": [1, 0], "name": "PURR/USDC", "index": 0, "isCanonical": true},
+    {"tokens": [3, 0], "name": "HFUN/USDC", "index": 1, "isCanonical": true}
+  ]
+}
 ```

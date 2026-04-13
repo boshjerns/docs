@@ -1,12 +1,26 @@
 ---
 title: "Predicted Fundings"
-openapi: "GET /exchange/predictedFundings"
+openapi: "GET /exchange/funding-rates"
 ---
 
 Predicted funding rates for the next funding interval per asset.
 
+Returns an array of `[asset, venues]` pairs, where each venue provides its predicted rate, next funding time, and interval.
+
 ## Example
 
 ```bash
-curl https://hyper.polynode.dev/exchange/predictedFundings
+curl https://hyper.polynode.dev/exchange/funding-rates
+```
+
+```json
+[
+  [
+    "BTC",
+    [
+      ["BinPerp", {"fundingRate": "-0.00088805", "nextFundingTime": 1776096000000, "fundingIntervalHours": 4}],
+      ["HlPerp", {"fundingRate": "-0.0003262298", "nextFundingTime": 1776092400000, "fundingIntervalHours": 1}]
+    ]
+  ]
+]
 ```

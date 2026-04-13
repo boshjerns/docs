@@ -1,6 +1,6 @@
 ---
 title: "Account State"
-openapi: "GET /exchange/user"
+openapi: "GET /exchange/user/state"
 ---
 
 Full clearinghouse state for a wallet — positions, margin, leverage, unrealized PnL.
@@ -8,7 +8,7 @@ Full clearinghouse state for a wallet — positions, margin, leverage, unrealize
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/exchange/user?address=0xc64cc00b46150e9274d09efc945c951710c4ef02"
+curl "https://hyper.polynode.dev/exchange/user/state?address=0xc64cc00b46150e9274d09efc945c951710c4ef02"
 ```
 
 ```json
@@ -26,7 +26,7 @@ curl "https://hyper.polynode.dev/exchange/user?address=0xc64cc00b46150e9274d09ef
         "coin": "BTC",
         "szi": "0.05",
         "entryPx": "70850.0",
-        "leverage": { "type": "cross", "value": 5 },
+        "leverage": {"type": "cross", "value": 5},
         "unrealizedPnl": "9.55"
       }
     }

@@ -1,6 +1,6 @@
 ---
 title: "Historical Funding"
-openapi: "GET /exchange/fundingHistory"
+openapi: "GET /exchange/market/funding-history"
 ---
 
 Historical funding rates for a single asset over a time window.
@@ -8,5 +8,5 @@ Historical funding rates for a single asset over a time window.
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/exchange/fundingHistory?asset=BTC&from=1775000000000"
+curl "https://hyper.polynode.dev/exchange/market/funding-history?coin=BTC&start_time=1775000000000"
 ```

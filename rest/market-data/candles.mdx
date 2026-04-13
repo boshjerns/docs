@@ -3,30 +3,42 @@ title: "OHLCV Candles"
 openapi: "GET /exchange/candles"
 ---
 
-OHLCV candles for a single asset and interval.
-
-`timestamp` is the start of the interval bucket in milliseconds.
-`volume` is in base asset units.
-`trades` is the count of fills aggregated into the candle.
+OHLCV candles for a single asset and interval. Both `start_time` and `end_time` are required.
 
 Supported intervals: `1m`, `5m`, `15m`, `1h`, `4h`, `1d`.
 
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/exchange/candles?asset=BTC&interval=1m&limit=10"
+curl "https://hyper.polynode.dev/exchange/candles?coin=BTC&interval=1h&start_time=1776000000000&end_time=1776090000000"
 ```
 
 ```json
 [
   {
-    "open": 71040.0,
-    "high": 71045.0,
-    "low": 71038.5,
-    "close": 71041.5,
-    "volume": 12.34567,
-    "timestamp": 1775702940000,
-    "trades": 47
+    "t": 1775998800000,
+    "T": 1776002399999,
+    "s": "BTC",
+    "i": "1h",
+    "o": "71052.0",
+    "c": "70855.0",
+    "h": "71106.0",
+    "l": "70833.0",
+    "v": "1726.25425",
+    "n": 26227
   }
 ]
 ```
+
+| Field | Description |
+|-------|-------------|
+| `t` | Open time (Unix ms) |
+| `T` | Close time (Unix ms) |
+| `s` | Symbol |
+| `i` | Interval |
+| `o` | Open price |
+| `c` | Close price |
+| `h` | High price |
+| `l` | Low price |
+| `v` | Volume (base asset units) |
+| `n` | Number of trades |
