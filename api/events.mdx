@@ -20,7 +20,8 @@ Every event is a JSON object:
       {"asset": 5, "oid": 366057443270}
     ]
   },
-  "network": "mainnet"
+  "network": "mainnet",
+  "proposer": "0xdf35aee8ef5658686142acd1e5ab5dbcdf8c51e8"
 }
 ```
 
@@ -36,6 +37,7 @@ Every event is a JSON object:
 | `user` | `string` | No | Hex address of the user who submitted the action |
 | `asset` | `string` | No | Human-readable asset name (e.g., `"BTC"`, `"SOL"`) |
 | `asset_id` | `number` | No | Numeric asset identifier |
+| `proposer` | `string` | Yes | Hex address of the block proposer (validator) |
 
 ## Coverage
 

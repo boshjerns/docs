@@ -68,7 +68,7 @@ ws.send(JSON.stringify({
 ## Prediction market events (testnet)
 
 ```typescript
-const ws = new WebSocket(`wss://hyper-testnet.polynode.dev/ws?key=${API_KEY}`);
+const ws = new WebSocket(`wss://hyper.polynode.dev/ws-testnet?key=${API_KEY}`);
 
 ws.on("open", () => {
   ws.send(JSON.stringify({

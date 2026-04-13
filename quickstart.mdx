@@ -63,13 +63,13 @@ Don't need every event? Subscribe with filters.
 {
   "action": "subscribe",
   "filters": {
-    "action_types": ["order", "cancel"],
+    "action_types": ["cancel", "cancelByCloid"],
     "assets": ["BTC", "ETH"]
   }
 }
 ```
 
-This delivers only BTC and ETH order/cancel events. See [Filters](/api/filters) for all options.
+This delivers only BTC and ETH cancel events. Cancels make up ~95% of mainnet traffic. See [Filters](/api/filters) for all options.
 
 ## 4. Check it's working
 

@@ -77,7 +77,7 @@ async def track_address(address: str):
 
 ```python
 async def prediction_markets():
-    testnet = f"wss://hyper-testnet.polynode.dev/ws?key={API_KEY}"
+    testnet = f"wss://hyper.polynode.dev/ws-testnet?key={API_KEY}"
 
     async with websockets.connect(testnet) as ws:
         await ws.send(json.dumps({
