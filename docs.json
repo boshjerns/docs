@@ -69,6 +69,14 @@
             ]
           },
           {
+            "group": "Trading",
+            "pages": [
+              "rest/trading/authentication",
+              "rest/trading/orders",
+              "rest/trading/account"
+            ]
+          },
+          {
             "group": "Market Data",
             "pages": [
               "rest/market-data/prices",
@@ -129,7 +137,8 @@
           {
             "group": "Passthrough",
             "pages": [
-              "rest/passthrough/info"
+              "rest/passthrough/info",
+              "rest/passthrough/raw"
             ]
           }
         ]

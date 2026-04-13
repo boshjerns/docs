@@ -1,0 +1,247 @@
+---
+title: Orders
+description: Place, cancel, and modify orders on HyperLiquid
+---
+
+All order endpoints require authentication via `X-API-Key` or `X-HL-Private-Key` header. See [Authentication](/rest/trading/authentication).
+
+All endpoints accept `?network=mainnet` (default) or `?network=testnet`.
+
+## Place a limit order
+
+**`POST /exchange/order`**
+
+```bash
+curl -X POST https://hyper.polynode.dev/exchange/order \
+  -H "X-API-Key: hn_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "coin": "BTC",
+    "side": "buy",
+    "size": 0.001,
+    "price": 50000
+  }'
+```
+
+**Request body:**
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `coin` | `string` | Yes | — | Asset symbol (e.g., `"BTC"`, `"ETH"`, `"SOL"`) |
+| `side` | `string` | Yes | — | `"buy"` or `"sell"` |
+| `size` | `number` | Yes | — | Order size in base asset |
+| `price` | `number` | Yes | — | Limit price |
+| `type` | `string` | No | `"limit"` | `"limit"` or `"trigger"` |
+| `tif` | `string` | No | `"Gtc"` | Time in force: `"Gtc"`, `"Ioc"`, or `"Alo"` |
+| `reduce_only` | `boolean` | No | `false` | Only reduce existing position |
+| `cloid` | `string` | No | — | Client order ID |
+| `trigger_px` | `number` | No | — | Trigger price (required when `type` is `"trigger"`) |
+| `is_market` | `boolean` | No | `true` | Execute at market when triggered |
+| `tpsl` | `string` | No | — | `"tp"` (take profit) or `"sl"` (stop loss) |
+| `builder_address` | `string` | No | — | Builder fee recipient address |
+| `builder_fee` | `number` | No | `1` | Builder fee in basis points |
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "response": {
+    "status": "ok",
+    "response": {
+      "type": "order",
+      "data": {"statuses": [{"resting": {"oid": 123456789}}]}
+    }
+  }
+}
+```
+
+## Market open
+
+Open a position at market price with slippage protection. Sends an IOC order at mid price +/- slippage.
+
+**`POST /exchange/market-open`**
+
+```bash
+curl -X POST https://hyper.polynode.dev/exchange/market-open \
+  -H "X-API-Key: hn_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"coin": "ETH", "side": "buy", "size": 0.1}'
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `coin` | `string` | Yes | — | Asset symbol |
+| `side` | `string` | Yes | — | `"buy"` or `"sell"` |
+| `size` | `number` | Yes | — | Order size |
+| `slippage` | `number` | No | `0.05` | Max slippage as decimal (0.05 = 5%) |
+| `cloid` | `string` | No | — | Client order ID |
+| `builder_address` | `string` | No | — | Builder fee recipient |
+| `builder_fee` | `number` | No | `1` | Builder fee (bps) |
+
+## Market close
+
+Close an existing position at market price. Automatically detects position direction and size.
+
+**`POST /exchange/market-close`**
+
+```bash
+curl -X POST https://hyper.polynode.dev/exchange/market-close \
+  -H "X-API-Key: hn_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"coin": "ETH"}'
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `coin` | `string` | Yes | — | Asset to close |
+| `size` | `number` | No | — | Partial close size (omit to close entire position) |
+| `slippage` | `number` | No | `0.05` | Max slippage as decimal |
+| `cloid` | `string` | No | — | Client order ID |
+
+## Cancel order
+
+Cancel a single order by order ID.
+
+**`DELETE /exchange/order`**
+
+```bash
+curl -X DELETE https://hyper.polynode.dev/exchange/order \
+  -H "X-API-Key: hn_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"coin": "BTC", "oid": 123456789}'
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `coin` | `string` | Yes | Asset symbol |
+| `oid` | `number` | Yes | Order ID to cancel |
+
+## Bulk cancel
+
+Cancel multiple orders at once. Supports both order IDs and client order IDs in a single request.
+
+**`DELETE /exchange/orders`**
+
+```bash
+curl -X DELETE https://hyper.polynode.dev/exchange/orders \
+  -H "X-API-Key: hn_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cancels": [
+      {"coin": "BTC", "oid": 111},
+      {"coin": "ETH", "oid": 222}
+    ],
+    "cloid_cancels": [
+      {"coin": "SOL", "cloid": "my-order-1"}
+    ]
+  }'
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `cancels` | `array` | No | List of `{coin, oid}` to cancel by order ID |
+| `cloid_cancels` | `array` | No | List of `{coin, cloid}` to cancel by client order ID |
+
+## Modify order
+
+Modify a single resting order.
+
+**`PATCH /exchange/order`**
+
+```bash
+curl -X PATCH https://hyper.polynode.dev/exchange/order \
+  -H "X-API-Key: hn_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "oid": 123456789,
+    "coin": "BTC",
+    "side": "buy",
+    "size": 0.002,
+    "price": 49000
+  }'
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `oid` | `number` | Yes | — | Order ID to modify |
+| `coin` | `string` | Yes | — | Asset symbol |
+| `side` | `string` | Yes | — | `"buy"` or `"sell"` |
+| `size` | `number` | Yes | — | New order size |
+| `price` | `number` | Yes | — | New limit price |
+| `tif` | `string` | No | `"Gtc"` | `"Gtc"`, `"Ioc"`, or `"Alo"` |
+| `reduce_only` | `boolean` | No | `false` | Reduce only |
+| `cloid` | `string` | No | — | Client order ID |
+
+## Batch modify
+
+Modify multiple orders in a single request.
+
+**`PATCH /exchange/orders`**
+
+```bash
+curl -X PATCH https://hyper.polynode.dev/exchange/orders \
+  -H "X-API-Key: hn_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "modifies": [
+      {"oid": 111, "coin": "BTC", "side": "buy", "size": 0.002, "price": 49000},
+      {"oid": 222, "coin": "ETH", "side": "sell", "size": 1.0, "price": 4000}
+    ]
+  }'
+```
+
+Each item in `modifies` has the same fields as the single modify endpoint.
+
+## Update leverage
+
+Change leverage for an asset. Applies to new and existing positions.
+
+**`POST /exchange/update-leverage`**
+
+```bash
+curl -X POST https://hyper.polynode.dev/exchange/update-leverage \
+  -H "X-API-Key: hn_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"coin": "BTC", "leverage": 10, "is_cross": true}'
+```
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `coin` | `string` | Yes | — | Asset symbol |
+| `leverage` | `number` | Yes | — | Leverage multiplier |
+| `is_cross` | `boolean` | No | `true` | Cross margin (`true`) or isolated (`false`) |
+
+## Update isolated margin
+
+Add or remove margin from an isolated position.
+
+**`POST /exchange/update-isolated-margin`**
+
+```bash
+curl -X POST https://hyper.polynode.dev/exchange/update-isolated-margin \
+  -H "X-API-Key: hn_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"coin": "BTC", "amount": 100.0}'
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `coin` | `string` | Yes | Asset symbol |
+| `amount` | `number` | Yes | USD amount to add (positive) or remove (negative) |
+
+## Schedule cancel
+
+Dead-man's switch. All open orders will be cancelled at the specified time unless you reschedule.
+
+**`POST /exchange/schedule-cancel`**
+
+```bash
+curl -X POST https://hyper.polynode.dev/exchange/schedule-cancel \
+  -H "X-API-Key: hn_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"time_ms": 1774938185046}'
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `time_ms` | `number` | Yes | Unix timestamp in milliseconds when orders should be cancelled |

@@ -1,0 +1,113 @@
+---
+title: Authentication
+description: Register your wallet, manage API keys, and verify your identity
+---
+
+The exchange API uses API keys to authenticate requests that need to sign HyperLiquid transactions (placing orders, modifying positions, etc.). You register your wallet once and get a key back.
+
+## Register a wallet
+
+Register your HyperLiquid private key to get an API key. The private key is encrypted and stored securely. It's used to sign transactions on your behalf when you place orders.
+
+<Warning>
+Start with testnet to verify everything works before registering a mainnet wallet.
+</Warning>
+
+**`POST /exchange/register`**
+
+```bash
+curl -X POST https://hyper.polynode.dev/exchange/register \
+  -H "Content-Type: application/json" \
+  -d '{"private_key": "0xYOUR_PRIVATE_KEY", "network": "testnet"}'
+```
+
+**Request body:**
+
+| Field | Type | Required | Default | Description |
+|-------|------|----------|---------|-------------|
+| `private_key` | `string` | Yes | — | Your HyperLiquid wallet private key |
+| `network` | `string` | No | `"mainnet"` | `"mainnet"` or `"testnet"` |
+
+**Response:**
+```json
+{
+  "api_key": "hn_a1b2c3d4e5f6...",
+  "address": "0xE8483011d3442eb93cE4aeFA16f37F0C08478C3A",
+  "network": "testnet"
+}
+```
+
+Save the `api_key` value. You'll pass it in the `X-API-Key` header on authenticated requests.
+
+## Revoke a key
+
+Delete your API key and the stored encrypted private key.
+
+**`DELETE /exchange/register`**
+
+```bash
+curl -X DELETE https://hyper.polynode.dev/exchange/register \
+  -H "X-API-Key: hn_a1b2c3d4e5f6..."
+```
+
+**Response:**
+```json
+{"status": "revoked"}
+```
+
+## Check your key
+
+Verify that your API key is valid and see the associated wallet address.
+
+**`GET /exchange/whoami`**
+
+```bash
+curl https://hyper.polynode.dev/exchange/whoami \
+  -H "X-API-Key: hn_a1b2c3d4e5f6..."
+```
+
+**Response:**
+```json
+{
+  "address": "0xE8483011d3442eb93cE4aeFA16f37F0C08478C3A",
+  "network": "testnet"
+}
+```
+
+## Using your key
+
+Once registered, pass the API key in the `X-API-Key` header:
+
+```bash
+# Check your positions
+curl https://hyper.polynode.dev/exchange/positions \
+  -H "X-API-Key: hn_a1b2c3d4e5f6..."
+
+# Place an order
+curl -X POST https://hyper.polynode.dev/exchange/order \
+  -H "X-API-Key: hn_a1b2c3d4e5f6..." \
+  -H "Content-Type: application/json" \
+  -d '{"coin": "BTC", "side": "buy", "size": 0.001, "price": 50000}'
+```
+
+## Alternative: per-request private key
+
+If you don't want to register, pass your private key directly on each request using the `X-HL-Private-Key` header:
+
+```bash
+curl -X POST https://hyper.polynode.dev/exchange/order \
+  -H "X-HL-Private-Key: 0xYOUR_PRIVATE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"coin": "BTC", "side": "buy", "size": 0.001, "price": 50000}' \
+  -G -d 'network=testnet'
+```
+
+Nothing is stored. The key is used for that single request and discarded.
+
+## Security
+
+- Your private key is encrypted at rest using Fernet symmetric encryption
+- The encryption key is stored in an environment variable, never in code
+- Keys are never logged or exposed in API responses
+- You can revoke your key at any time to delete the stored credentials
+- All traffic is served over HTTPS

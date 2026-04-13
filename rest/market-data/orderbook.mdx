@@ -1,6 +1,6 @@
 ---
 title: "L2 Orderbook"
-openapi: "GET /api/orderbook"
+openapi: "GET /exchange/orderbook"
 ---
 
 Returns the L2 orderbook for a single asset.
@@ -10,7 +10,7 @@ Top 20 levels per side. Each level has `px` (price), `sz` (aggregate size), and 
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/api/orderbook?asset=BTC"
+curl "https://hyper.polynode.dev/exchange/orderbook?asset=BTC"
 ```
 
 ```json

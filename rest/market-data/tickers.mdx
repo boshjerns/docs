@@ -1,6 +1,6 @@
 ---
 title: "All Tickers"
-openapi: "GET /api/tickers"
+openapi: "GET /exchange/tickers"
 ---
 
 Compact ticker for every asset — best bid/offer, mark, last, 24h volume, 24h change, open interest, funding rate.
@@ -10,7 +10,7 @@ Lighter than per-asset orderbook calls. Use this for dashboards showing all mark
 ## Example
 
 ```bash
-curl https://hyper.polynode.dev/api/tickers
+curl https://hyper.polynode.dev/exchange/tickers
 ```
 
 ```json

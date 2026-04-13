@@ -1,0 +1,26 @@
+---
+title: "Exchange Passthrough"
+---
+
+Forward a pre-signed action directly to HyperLiquid's `/exchange` endpoint. Use this when you handle EIP-712 signing yourself and just need hypernode to proxy the request.
+
+No authentication required. The payload is forwarded as-is.
+
+## Example
+
+```bash
+curl -X POST https://hyper.polynode.dev/exchange/raw \
+  -H "Content-Type: application/json" \
+  -d '{
+    "action": { "type": "order", ... },
+    "nonce": 1234567890,
+    "signature": { "r": "0x...", "s": "0x...", "v": 27 },
+    "vaultAddress": null
+  }'
+```
+
+## Use cases
+
+- You have your own signing implementation and want to use hypernode as a proxy
+- Integrating with existing SDKs that handle signing
+- Actions not yet supported by the named trading endpoints

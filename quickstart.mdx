@@ -1,6 +1,6 @@
 ---
 title: Quickstart
-description: Connect to hypernode and start streaming HyperLiquid transactions
+description: Get started with hypernode's real-time stream or exchange API
 ---
 
 ## 1. Get an API key
@@ -90,6 +90,51 @@ You should see events flowing immediately. On mainnet, expect 500-1000 actions p
 }
 ```
 
+---
+
+## Exchange API quickstart
+
+Trade on HyperLiquid with REST endpoints. No SDK needed.
+
+### 1. Register your wallet
+
+```bash
+curl -X POST https://hyper.polynode.dev/exchange/register \
+  -H "Content-Type: application/json" \
+  -d '{"private_key": "0xYOUR_HL_PRIVATE_KEY", "network": "testnet"}'
+```
+
+Returns: `{"api_key": "hn_a1b2c3d4e5f6...", "address": "0x...", "network": "testnet"}`
+
+<Tip>
+Start with `"network": "testnet"` to test safely before using mainnet.
+</Tip>
+
+### 2. Place an order
+
+```bash
+curl -X POST https://hyper.polynode.dev/exchange/order \
+  -H "X-API-Key: hn_a1b2c3d4e5f6..." \
+  -H "Content-Type: application/json" \
+  -d '{"coin": "BTC", "side": "buy", "size": 0.001, "price": 50000}'
+```
+
+### 3. Check your positions
+
+```bash
+curl https://hyper.polynode.dev/exchange/positions \
+  -H "X-API-Key: hn_a1b2c3d4e5f6..."
+```
+
+### 4. Query market data (no auth needed)
+
+```bash
+curl https://hyper.polynode.dev/exchange/prices
+curl "https://hyper.polynode.dev/exchange/orderbook?coin=BTC"
+```
+
+---
+
 ## Next steps
 
 <CardGroup cols={2}>
@@ -99,10 +144,10 @@ You should see events flowing immediately. On mainnet, expect 500-1000 actions p
   <Card title="Action Types" icon="list" href="/actions/overview">
     All 53 decoded action types with example payloads
   </Card>
-  <Card title="Prediction Markets" icon="chart-line" href="/actions/prediction-markets">
-    HIP-4 prediction market enrichment
+  <Card title="Orders" icon="arrow-right-arrow-left" href="/rest/trading/orders">
+    Place, cancel, and modify orders
   </Card>
-  <Card title="Authentication" icon="key" href="/api/authentication">
-    Tiers, rate limits, and error codes
+  <Card title="Market Data" icon="chart-line" href="/rest/market-data/prices">
+    Prices, orderbook, funding, trades, and candles
   </Card>
 </CardGroup>

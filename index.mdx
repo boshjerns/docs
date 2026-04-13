@@ -1,11 +1,11 @@
 ---
 title: hypernode
-description: Real-time HyperLiquid L1 transaction stream, by polynode
+description: Real-time HyperLiquid data stream and exchange API, by polynode
 ---
 
 # hypernode
 
-Real-time streaming API for every committed transaction on the HyperLiquid blockchain. Delivered via WebSocket within milliseconds of commitment.
+Two products for building on HyperLiquid: a real-time L1 transaction stream and a language-agnostic exchange API.
 
 <CardGroup cols={3}>
   <Card title="+333ms" icon="bolt">
@@ -59,11 +59,26 @@ ws.on("message", (raw) => {
 });
 ```
 
+## Exchange API
+
+51 REST endpoints for trading, market data, and account management. No SDK required. Works from any language.
+
+```bash
+# Get all mid prices (no auth needed)
+curl https://hyper.polynode.dev/exchange/prices
+
+# Place a limit order (requires API key)
+curl -X POST https://hyper.polynode.dev/exchange/order \
+  -H "X-API-Key: hn_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"coin": "BTC", "side": "buy", "size": 0.001, "price": 50000}'
+```
+
 <CardGroup cols={2}>
-  <Card title="Quickstart" icon="rocket" href="/quickstart">
-    Connect and start streaming in 2 minutes
+  <Card title="Stream Quickstart" icon="bolt" href="/quickstart">
+    Connect to the real-time WebSocket stream
   </Card>
-  <Card title="API Reference" icon="book" href="/api/connection">
-    Full endpoint and protocol documentation
+  <Card title="Exchange API" icon="code" href="/rest/overview">
+    REST endpoints for trading and market data
   </Card>
 </CardGroup>

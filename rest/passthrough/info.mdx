@@ -1,6 +1,6 @@
 ---
 title: "Generic Passthrough"
-openapi: "POST /api/info"
+openapi: "POST /exchange/info"
 ---
 
 Generic passthrough that accepts any HyperLiquid info request body. Use this for any query type not covered by the dedicated endpoints.
@@ -12,7 +12,7 @@ This means any future HyperLiquid query type works automatically without us ship
 ## Example
 
 ```bash
-curl -X POST https://hyper.polynode.dev/api/info \
+curl -X POST https://hyper.polynode.dev/exchange/info \
   -H 'Content-Type: application/json' \
   -d '{"type": "userRateLimit", "user": "0xc64cc00b46150e9274d09efc945c951710c4ef02"}'
 ```

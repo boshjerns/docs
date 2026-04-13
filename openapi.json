@@ -68,7 +68,7 @@
         "responses": { "200": { "description": "Metrics JSON" } }
       }
     },
-    "/api/prices": {
+    "/exchange/prices": {
       "get": {
         "tags": ["Market Data"],
         "summary": "All mid prices",
@@ -95,7 +95,7 @@
         }
       }
     },
-    "/api/orderbook": {
+    "/exchange/orderbook": {
       "get": {
         "tags": ["Market Data"],
         "summary": "L2 orderbook",
@@ -124,7 +124,7 @@
         }
       }
     },
-    "/api/l4book": {
+    "/exchange/l4book": {
       "get": {
         "tags": ["Market Data"],
         "summary": "L4 orderbook with maker addresses",
@@ -150,7 +150,7 @@
         }
       }
     },
-    "/api/l4stats": {
+    "/exchange/l4stats": {
       "get": {
         "tags": ["Market Data"],
         "summary": "L4 book statistics",
@@ -159,7 +159,7 @@
         "responses": { "200": { "description": "L4 stats" } }
       }
     },
-    "/api/tickers": {
+    "/exchange/tickers": {
       "get": {
         "tags": ["Market Data"],
         "summary": "All tickers",
@@ -180,7 +180,7 @@
         }
       }
     },
-    "/api/stats": {
+    "/exchange/stats": {
       "get": {
         "tags": ["Market Data"],
         "summary": "24h statistics",
@@ -201,7 +201,7 @@
         }
       }
     },
-    "/api/funding": {
+    "/exchange/funding": {
       "get": {
         "tags": ["Market Data"],
         "summary": "All funding rates",
@@ -222,7 +222,7 @@
         }
       }
     },
-    "/api/openInterest": {
+    "/exchange/openInterest": {
       "get": {
         "tags": ["Market Data"],
         "summary": "Open interest rankings",
@@ -231,7 +231,7 @@
         "responses": { "200": { "description": "Open interest array" } }
       }
     },
-    "/api/predictedFundings": {
+    "/exchange/predictedFundings": {
       "get": {
         "tags": ["Market Data"],
         "summary": "Predicted next funding rates",
@@ -240,7 +240,7 @@
         "responses": { "200": { "description": "Predicted fundings" } }
       }
     },
-    "/api/fundingHistory": {
+    "/exchange/fundingHistory": {
       "get": {
         "tags": ["Market Data"],
         "summary": "Historical funding rates",
@@ -254,7 +254,7 @@
         "responses": { "200": { "description": "Funding history array" } }
       }
     },
-    "/api/trades": {
+    "/exchange/trades": {
       "get": {
         "tags": ["Market Data"],
         "summary": "Recent trades",
@@ -276,7 +276,7 @@
         }
       }
     },
-    "/api/candles": {
+    "/exchange/candles": {
       "get": {
         "tags": ["Market Data"],
         "summary": "OHLCV candles",
@@ -299,7 +299,7 @@
         }
       }
     },
-    "/api/user": {
+    "/exchange/user": {
       "get": {
         "tags": ["User Data"],
         "summary": "Account state",
@@ -311,7 +311,7 @@
         "responses": { "200": { "description": "User clearinghouse state" } }
       }
     },
-    "/api/openOrders": {
+    "/exchange/openOrders": {
       "get": {
         "tags": ["User Data"],
         "summary": "User open orders",
@@ -323,7 +323,7 @@
         "responses": { "200": { "description": "Open orders array" } }
       }
     },
-    "/api/userFills": {
+    "/exchange/userFills": {
       "get": {
         "tags": ["User Data"],
         "summary": "User fill history",
@@ -335,7 +335,7 @@
         "responses": { "200": { "description": "User fills array" } }
       }
     },
-    "/api/userFunding": {
+    "/exchange/userFunding": {
       "get": {
         "tags": ["User Data"],
         "summary": "User funding payments",
@@ -349,7 +349,7 @@
         "responses": { "200": { "description": "User funding history" } }
       }
     },
-    "/api/userVaults": {
+    "/exchange/userVaults": {
       "get": {
         "tags": ["User Data"],
         "summary": "User vault deposits",
@@ -361,7 +361,7 @@
         "responses": { "200": { "description": "User vault equities" } }
       }
     },
-    "/api/userStaking": {
+    "/exchange/userStaking": {
       "get": {
         "tags": ["User Data"],
         "summary": "User staking positions",
@@ -373,7 +373,7 @@
         "responses": { "200": { "description": "Delegation summary" } }
       }
     },
-    "/api/userReferrals": {
+    "/exchange/userReferrals": {
       "get": {
         "tags": ["User Data"],
         "summary": "User referrals",
@@ -385,7 +385,7 @@
         "responses": { "200": { "description": "Referral data" } }
       }
     },
-    "/api/subAccounts": {
+    "/exchange/subAccounts": {
       "get": {
         "tags": ["User Data"],
         "summary": "User sub-accounts",
@@ -397,7 +397,7 @@
         "responses": { "200": { "description": "Sub-accounts array" } }
       }
     },
-    "/api/portfolio": {
+    "/exchange/portfolio": {
       "get": {
         "tags": ["User Data"],
         "summary": "Portfolio history",
@@ -409,7 +409,7 @@
         "responses": { "200": { "description": "Portfolio history" } }
       }
     },
-    "/api/userFees": {
+    "/exchange/userFees": {
       "get": {
         "tags": ["User Data"],
         "summary": "User fee structure",
@@ -421,7 +421,7 @@
         "responses": { "200": { "description": "User fees" } }
       }
     },
-    "/api/spotState": {
+    "/exchange/spotState": {
       "get": {
         "tags": ["User Data"],
         "summary": "Spot account state",
@@ -433,7 +433,7 @@
         "responses": { "200": { "description": "Spot account state" } }
       }
     },
-    "/api/assets": {
+    "/exchange/assets": {
       "get": {
         "tags": ["Discovery"],
         "summary": "All asset metadata",
@@ -454,7 +454,7 @@
         }
       }
     },
-    "/api/spotPairs": {
+    "/exchange/spotPairs": {
       "get": {
         "tags": ["Discovery"],
         "summary": "Spot trading pairs",
@@ -463,7 +463,7 @@
         "responses": { "200": { "description": "Spot pairs array" } }
       }
     },
-    "/api/predictionMarkets": {
+    "/exchange/predictionMarkets": {
       "get": {
         "tags": ["Prediction Markets"],
         "summary": "All prediction markets",
@@ -472,7 +472,7 @@
         "responses": { "200": { "description": "Prediction markets" } }
       }
     },
-    "/api/predictionMarket": {
+    "/exchange/predictionMarket": {
       "get": {
         "tags": ["Prediction Markets"],
         "summary": "Single prediction market",
@@ -487,7 +487,7 @@
         }
       }
     },
-    "/api/vaults": {
+    "/exchange/vaults": {
       "get": {
         "tags": ["Vaults & Governance"],
         "summary": "All vaults",
@@ -496,7 +496,7 @@
         "responses": { "200": { "description": "Vaults array" } }
       }
     },
-    "/api/vault": {
+    "/exchange/vault": {
       "get": {
         "tags": ["Vaults & Governance"],
         "summary": "Single vault details",
@@ -507,7 +507,7 @@
         "responses": { "200": { "description": "Vault details" } }
       }
     },
-    "/api/validators": {
+    "/exchange/validators": {
       "get": {
         "tags": ["Vaults & Governance"],
         "summary": "Active validators",
@@ -528,7 +528,7 @@
         }
       }
     },
-    "/api/proposals": {
+    "/exchange/proposals": {
       "get": {
         "tags": ["Vaults & Governance"],
         "summary": "Active proposals",
@@ -537,7 +537,7 @@
         "responses": { "200": { "description": "Proposals array" } }
       }
     },
-    "/api/perpAuction": {
+    "/exchange/perpAuction": {
       "get": {
         "tags": ["Discovery"],
         "summary": "Perp deploy auction",
@@ -546,7 +546,7 @@
         "responses": { "200": { "description": "Perp auction status" } }
       }
     },
-    "/api/spotAuction": {
+    "/exchange/spotAuction": {
       "get": {
         "tags": ["Discovery"],
         "summary": "Spot deploy auction",
@@ -555,7 +555,7 @@
         "responses": { "200": { "description": "Spot auction status" } }
       }
     },
-    "/api/info": {
+    "/exchange/info": {
       "post": {
         "tags": ["Passthrough"],
         "summary": "Generic HL info passthrough",

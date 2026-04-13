@@ -1,6 +1,6 @@
 ---
 title: "L4 Orderbook"
-openapi: "GET /api/l4book"
+openapi: "GET /exchange/l4book"
 ---
 
 L4 orderbook with individual orders attributed to specific maker addresses. **Unique to hypernode.**
@@ -12,7 +12,7 @@ Each level shows the L2 total size (`sz`), individual orders attributed to speci
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/api/l4book?asset=DOGE"
+curl "https://hyper.polynode.dev/exchange/l4book?asset=DOGE"
 ```
 
 ```json

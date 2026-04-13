@@ -1,0 +1,117 @@
+---
+title: Account
+description: Query your positions, orders, fills, balances, and fees
+---
+
+All account endpoints require authentication via `X-API-Key` or `X-HL-Private-Key` header. See [Authentication](/rest/trading/authentication).
+
+These endpoints query data for the wallet associated with your API key. For looking up any public address without authentication, see [User Data](/rest/user-data/user).
+
+## Positions
+
+Get your full clearinghouse state including all open positions, margin, and account value.
+
+**`GET /exchange/positions`**
+
+```bash
+curl https://hyper.polynode.dev/exchange/positions \
+  -H "X-API-Key: hn_YOUR_KEY"
+```
+
+## Open orders
+
+Get all currently resting orders.
+
+**`GET /exchange/open-orders`**
+
+```bash
+curl https://hyper.polynode.dev/exchange/open-orders \
+  -H "X-API-Key: hn_YOUR_KEY"
+```
+
+## Fills
+
+Get recent trade fills.
+
+**`GET /exchange/fills`**
+
+```bash
+curl https://hyper.polynode.dev/exchange/fills \
+  -H "X-API-Key: hn_YOUR_KEY"
+```
+
+## Fills by time range
+
+Get fills within a specific time window.
+
+**`GET /exchange/fills/by-time`**
+
+```bash
+curl "https://hyper.polynode.dev/exchange/fills/by-time?start_time=1774900000000&end_time=1774940000000" \
+  -H "X-API-Key: hn_YOUR_KEY"
+```
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `start_time` | `number` | Yes | Start timestamp (Unix ms) |
+| `end_time` | `number` | No | End timestamp (Unix ms) |
+
+## Order status
+
+Check the status of a specific order by ID.
+
+**`GET /exchange/order-status/{oid}`**
+
+```bash
+curl https://hyper.polynode.dev/exchange/order-status/123456789 \
+  -H "X-API-Key: hn_YOUR_KEY"
+```
+
+## Balances
+
+Get your spot token balances.
+
+**`GET /exchange/balances`**
+
+```bash
+curl https://hyper.polynode.dev/exchange/balances \
+  -H "X-API-Key: hn_YOUR_KEY"
+```
+
+## Funding history
+
+Get your funding payments over a time range.
+
+**`GET /exchange/funding-history`**
+
+```bash
+curl "https://hyper.polynode.dev/exchange/funding-history?start_time=1774900000000" \
+  -H "X-API-Key: hn_YOUR_KEY"
+```
+
+| Param | Type | Required | Description |
+|-------|------|----------|-------------|
+| `start_time` | `number` | Yes | Start timestamp (Unix ms) |
+| `end_time` | `number` | No | End timestamp (Unix ms) |
+
+## Fees
+
+Get your current fee tier and rates.
+
+**`GET /exchange/fees`**
+
+```bash
+curl https://hyper.polynode.dev/exchange/fees \
+  -H "X-API-Key: hn_YOUR_KEY"
+```
+
+## Portfolio
+
+Get a portfolio summary including all positions and account metrics.
+
+**`GET /exchange/portfolio`**
+
+```bash
+curl https://hyper.polynode.dev/exchange/portfolio \
+  -H "X-API-Key: hn_YOUR_KEY"
+```
