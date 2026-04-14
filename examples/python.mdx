@@ -1,102 +1,122 @@
 ---
 title: Python
-description: Connect to hypernode with Python
+description: Connect to the hypernode stream with Python
 ---
 
 ## Install
 
 ```bash
-pip install websockets
+pip install websocket-client requests
 ```
 
-## Firehose (all events)
+## Basic connection
 
 ```python
-import asyncio
 import json
-import websockets
+import websocket
 
-API_KEY = "pn_live_your_key_here"
-URL = f"wss://hyper.polynode.dev/ws?key={API_KEY}"
+def on_message(ws, message):
+    event = json.loads(message)
 
-async def firehose():
-    async with websockets.connect(URL) as ws:
-        await ws.send(json.dumps({"action": "subscribe"}))
-        confirmation = await ws.recv()
-        print(f"Subscribed: {confirmation}")
+    # Skip protocol messages
+    if "action" in event:
+        return
 
-        async for message in ws:
-            event = json.loads(message)
-            user = (event.get("user") or "")[:12]
-            print(
-                f"[{event['block']}] {event['type']:20s} | {user:14s} | "
-                f"{event.get('asset', '')}"
-            )
+    layer = event.get("consensus", "?")  # "pre" or "confirmed"
 
-asyncio.run(firehose())
+    if event["type"] == "order":
+        d = event["data"]
+        side = "BUY" if d["side"] == "B" else "SELL"
+        print(f"[{layer}] ORDER {event['asset']} {side} {d['sz']}@{d['px']} [{d['tif']}]")
+
+    elif event["type"] == "fill":
+        d = event["data"]
+        side = "BUY" if d["side"] == "B" else "SELL"
+        print(f"[{layer}] FILL {event['asset']} {side} {d['sz']}@{d['px']} {d['dir']} PnL={d['closedPnl']}")
+
+def on_open(ws):
+    ws.send(json.dumps({
+        "action": "subscribe",
+        "filters": {"action_types": ["order", "fill"]}
+    }))
+
+def on_error(ws, error):
+    print(f"Error: {error}")
+
+ws = websocket.WebSocketApp(
+    "wss://hyper.polynode.dev/ws?key=pn_live_YOUR_KEY",
+    on_open=on_open,
+    on_message=on_message,
+    on_error=on_error,
+)
+ws.run_forever()
 ```
 
-## Filtered subscription
+## Track a wallet
 
 ```python
-async def filtered():
-    async with websockets.connect(URL) as ws:
-        await ws.send(json.dumps({
-            "action": "subscribe",
-            "id": "eth-cancels",
-            "filters": {
-                "action_types": ["cancel", "cancelByCloid"],
-                "assets": ["ETH"],
-            },
-        }))
-        confirmation = await ws.recv()
-        print(f"Subscribed: {confirmation}")
-
-        async for message in ws:
-            event = json.loads(message)
-            print(f"{event['type']} | {event.get('user', '?')[:14]}")
+def on_open(ws):
+    ws.send(json.dumps({
+        "action": "subscribe",
+        "filters": {
+            "addresses": ["0xd071d6d6ea52f5aa34b79e47f908ee48c8215837"]
+        }
+    }))
 ```
 
-## Track a specific address
+## L4 Order Book (REST)
 
 ```python
-async def track_address(address: str):
-    async with websockets.connect(URL) as ws:
-        await ws.send(json.dumps({
-            "action": "subscribe",
-            "filters": {"addresses": [address]},
-        }))
-        await ws.recv()
+import requests
 
-        async for message in ws:
-            event = json.loads(message)
-            print(json.dumps(event, indent=2))
+resp = requests.get(
+    "https://hyper.polynode.dev/v2/l4book?coin=BTC",
+    headers={"x-api-key": "pn_live_YOUR_KEY"}
+)
+book = resp.json()
+
+print(f"BTC: {book['bid_count']} bids, {book['ask_count']} asks")
+
+# Top 5 bids
+for order in sorted(book["bids"], key=lambda o: -float(o["limitPx"]))[:5]:
+    print(f"  BID {order['limitPx']} x {order['sz']} by {order['user'][:14]}...")
 ```
 
-## Prediction markets (testnet)
+## L4 Summary
 
 ```python
-async def prediction_markets():
-    testnet = f"wss://hyper.polynode.dev/ws-testnet?key={API_KEY}"
+resp = requests.get(
+    "https://hyper.polynode.dev/v2/l4book/summary",
+    headers={"x-api-key": "pn_live_YOUR_KEY"}
+)
+data = resp.json()
+print(f"{data['markets']} markets, {data['total_orders']} total orders")
+for m in data["data"][:10]:
+    print(f"  {m['coin']}: {m['bid_orders']} bids, {m['ask_orders']} asks")
+```
 
-    async with websockets.connect(testnet) as ws:
-        await ws.send(json.dumps({
-            "action": "subscribe",
-            "filters": {
-                "action_types": [
-                    "userOutcome", "splitOutcome", "mergeOutcome",
-                    "mergeQuestion", "negateOutcome",
-                ],
-            },
-        }))
-        await ws.recv()
+## Borrow/Lend Rates
 
-        async for message in ws:
-            event = json.loads(message)
-            data = event.get("data", {})
-            print(
-                f"[{event['type']}] "
-                f"{data.get('prediction_question', '?')} / "
-                f"{data.get('prediction_name', '?')}"
-            )
+```python
+resp = requests.get(
+    "https://hyper.polynode.dev/v2/borrow-lend/reserves",
+    headers={"x-api-key": "pn_live_YOUR_KEY"}
+)
+for token_id, state in resp.json():
+    print(f"Token {token_id}: borrow={state['borrowYearlyRate']} supply={state['supplyYearlyRate']}")
+```
+
+## Multiple filters (AND logic)
+
+```python
+# Only BTC fills from a specific wallet
+def on_open(ws):
+    ws.send(json.dumps({
+        "action": "subscribe",
+        "filters": {
+            "action_types": ["fill"],
+            "assets": ["BTC"],
+            "addresses": ["0xd071d6d6ea52f5aa34b79e47f908ee48c8215837"]
+        }
+    }))
 ```

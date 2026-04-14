@@ -1,6 +1,6 @@
 ---
 title: TypeScript
-description: Connect to hypernode with TypeScript
+description: Connect to the hypernode stream with TypeScript
 ---
 
 ## Install
@@ -9,76 +9,118 @@ description: Connect to hypernode with TypeScript
 npm install ws
 ```
 
-## Firehose (all events)
+## Basic connection
 
 ```typescript
 import WebSocket from "ws";
 
-const API_KEY = "pn_live_your_key_here";
-const ws = new WebSocket(`wss://hyper.polynode.dev/ws?key=${API_KEY}`);
+const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=pn_live_YOUR_KEY");
 
 ws.on("open", () => {
-  console.log("Connected to hypernode");
-  ws.send(JSON.stringify({ action: "subscribe" }));
+  // Subscribe to orders and fills
+  ws.send(JSON.stringify({
+    action: "subscribe",
+    filters: { action_types: ["order", "fill"] }
+  }));
 });
 
-ws.on("message", (raw: Buffer) => {
-  const msg = JSON.parse(raw.toString());
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
 
-  if (msg.action === "subscribed") {
-    console.log(`Subscribed: sub_id=${msg.sub_id}`);
-    return;
+  // Skip protocol messages
+  if (event.action) return;
+
+  // Every event has a consensus field
+  const layer = event.consensus; // "pre" or "confirmed"
+
+  if (event.type === "order") {
+    const d = event.data;
+    console.log(
+      `[${layer}] ORDER ${event.asset} ${d.side === "B" ? "BUY" : "SELL"} ${d.sz}@${d.px} [${d.tif}]`
+    );
   }
 
-  console.log(
-    `[${msg.block}] ${msg.type} | ${msg.user?.slice(0, 12) ?? "?"} | ${msg.asset ?? ""}`
-  );
+  if (event.type === "fill") {
+    const d = event.data;
+    console.log(
+      `[${layer}] FILL ${event.asset} ${d.side === "B" ? "BUY" : "SELL"} ${d.sz}@${d.px} ${d.dir} PnL=${d.closedPnl}`
+    );
+  }
 });
 
 ws.on("close", () => console.log("Disconnected"));
 ws.on("error", (err) => console.error("Error:", err.message));
 ```
 
-## Filtered subscription
-
-```typescript
-// Only BTC and ETH cancels
-ws.send(JSON.stringify({
-  action: "subscribe",
-  id: "btc-eth-cancels",
-  filters: {
-    action_types: ["cancel", "cancelByCloid"],
-    assets: ["BTC", "ETH"],
-  },
-}));
-```
-
-## Track a specific address
+## Track a wallet
 
 ```typescript
 ws.send(JSON.stringify({
   action: "subscribe",
   id: "whale-tracker",
   filters: {
-    addresses: ["0xd071d6d6ea52f5aa34b79e47f908ee48c8215837"],
-  },
+    addresses: ["0xd071d6d6ea52f5aa34b79e47f908ee48c8215837"]
+  }
 }));
 ```
 
-## Prediction market events (testnet)
+## Pre-consensus cancel detection
 
 ```typescript
-const ws = new WebSocket(`wss://hyper.polynode.dev/ws-testnet?key=${API_KEY}`);
+ws.send(JSON.stringify({
+  action: "subscribe",
+  id: "early-cancels",
+  filters: {
+    action_types: ["cancel", "cancelByCloid", "batchModify"],
+    assets: ["BTC", "ETH"]
+  }
+}));
 
-ws.on("open", () => {
-  ws.send(JSON.stringify({
-    action: "subscribe",
-    filters: {
-      action_types: [
-        "userOutcome", "splitOutcome", "mergeOutcome",
-        "mergeQuestion", "negateOutcome",
-      ],
-    },
-  }));
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  if (event.action) return;
+
+  if (event.consensus === "pre") {
+    console.log(`PRE-CONSENSUS: ${event.type} on ${event.asset} by ${event.user?.slice(0, 10)}`);
+  }
 });
+```
+
+## L4 Order Book (REST)
+
+```typescript
+const resp = await fetch("https://hyper.polynode.dev/v2/l4book?coin=BTC", {
+  headers: { "x-api-key": "pn_live_YOUR_KEY" }
+});
+const book = await resp.json();
+
+console.log(`BTC: ${book.bid_count} bids, ${book.ask_count} asks`);
+
+// Find the largest order
+const allOrders = [...book.bids, ...book.asks];
+const biggest = allOrders.reduce((max, o) =>
+  parseFloat(o.sz) > parseFloat(max.sz) ? o : max
+);
+console.log(`Largest: ${biggest.sz}@${biggest.limitPx} by ${biggest.user}`);
+```
+
+## Multiple subscriptions
+
+```typescript
+// Track BTC orders
+ws.send(JSON.stringify({
+  action: "subscribe",
+  id: "btc",
+  filters: { action_types: ["order", "fill"], assets: ["BTC"] }
+}));
+
+// Track ETH pre-consensus
+ws.send(JSON.stringify({
+  action: "subscribe",
+  id: "eth-pre",
+  filters: { action_types: ["cancel", "batchModify"], assets: ["ETH"] }
+}));
+
+// Unsubscribe from ETH later
+ws.send(JSON.stringify({ action: "unsubscribe", id: "eth-pre" }));
 ```

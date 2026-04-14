@@ -1,187 +1,74 @@
 ---
-title: Account & Transfer Actions
-description: Transfers, agent approval, governance, and staking action formats
+title: Account Actions
+description: Referrals, agents, transfers, and governance event formats
 ---
+
+Account actions are less frequent but carry important signal. These appear in the pre-consensus layer.
 
 ## setReferrer
 
-Set a referral code for fee discounts. The `data` field is the referral code string.
+Set a referral code. Common from automated trading systems.
 
 ```json
 {
-  "block": 70873218,
-  "timestamp": 1774938186661,
   "type": "setReferrer",
-  "user": "0xa775d1bd91ee2cc4cae6113e5fd9c0c17b355277",
-  "data": "CCXT1",
-  "network": "mainnet"
+  "consensus": "pre",
+  "user": "0x5c09a84500000000...",
+  "data": "CCXT1"
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `data` | `string` | Referral code to apply |
-
-## agentSetAbstraction
-
-An authorized agent enables [DEX abstraction](/research/accounts) mode for the user's account. DEX abstraction allows unified margin across multiple DEX-listed assets.
-
-```json
-{
-  "block": 70873229,
-  "timestamp": 1774938188168,
-  "type": "agentSetAbstraction",
-  "user": "0x00000000044186110001adbc00000006656631c0",
-  "data": "u",
-  "network": "mainnet"
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `data` | `string` | Abstraction mode: `"u"` = unified (DEX abstraction enabled) |
+The `data` field is the referral code string.
 
 ## approveAgent
 
-Authorize a trading agent (bot) to act on behalf of the user. Each account can have up to 1 unnamed + 3 named agents, plus 2 per sub-account.
+Authorize a trading agent (API wallet) to trade on behalf of the user.
 
 ```json
 {
   "type": "approveAgent",
+  "consensus": "pre",
+  "user": "0x...",
   "data": {
     "agentAddress": "0x...",
-    "agentName": "HyperBot",
-    "extraAgentName": null
+    "agentName": "my-bot"
   }
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `agentAddress` | `string` | Address to authorize |
-| `agentName` | `string` | Display name for the agent |
-| `extraAgentName` | `string\|null` | Optional secondary name |
+## evmRawTx
 
-## usdSend
-
-Transfer USDC to another address on HyperLiquid L1. Internal transfer, no bridge involved.
+A raw EVM transaction on HyperEVM. These carry smart contract interactions.
 
 ```json
 {
-  "type": "usdSend",
+  "type": "evmRawTx",
+  "consensus": "pre",
+  "user": "0xe834922b2feee69b...",
   "data": {
-    "destination": "0x...",
-    "amount": "100.00"
+    "calldataLen": 900,
+    "chainId": 999,
+    "gas": 367059,
+    "maxFeePerGas": 4000000000,
+    "maxPriorityFeePerGas": 0
   }
 }
 ```
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `destination` | `string` | Recipient address |
-| `amount` | `string` | Amount in USDC |
+## Other account actions
 
-## withdraw3
+These appear less frequently in the stream:
 
-Withdraw USDC from HyperLiquid to Arbitrum via the L1 bridge. The "3" in the name reflects the third iteration of the withdrawal action type. Finalization takes approximately 5 minutes with a $1 fee.
-
-```json
-{
-  "type": "withdraw3",
-  "data": {
-    "amount": "500.00",
-    "destination": "0x..."
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `amount` | `string` | Amount in USDC |
-| `destination` | `string` | Destination address on Arbitrum |
-
-## vaultTransfer
-
-Deposit to or withdraw from a vault.
-
-```json
-{
-  "type": "vaultTransfer",
-  "data": {
-    "vaultAddress": "0x...",
-    "isDeposit": true,
-    "usd": "1000.00"
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `vaultAddress` | `string` | Vault address |
-| `isDeposit` | `boolean` | `true` = deposit, `false` = withdraw |
-| `usd` | `string` | Amount in USDC |
-
-## subAccountTransfer
-
-Transfer funds between main account and sub-account.
-
-```json
-{
-  "type": "subAccountTransfer",
-  "data": {
-    "subAccountUser": "0x...",
-    "isDeposit": true,
-    "usd": "500.00"
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `subAccountUser` | `string` | Sub-account address |
-| `isDeposit` | `boolean` | `true` = transfer to sub-account, `false` = transfer to main |
-| `usd` | `string` | Amount in USDC |
-
-## tokenDelegate
-
-Delegate or undelegate HYPE tokens to a validator. Delegation has a 1-day lockup per validator, undelegation enters a 7-day queue.
-
-```json
-{
-  "type": "tokenDelegate",
-  "data": {
-    "validator": "0x...",
-    "amount": "1000",
-    "isUndelegate": false
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `validator` | `string` | Validator address |
-| `amount` | `string` | Amount of HYPE |
-| `isUndelegate` | `boolean` | `true` = undelegate, `false` = delegate |
-
-## govVote
-
-Vote on a governance proposal. Stake-weighted voting.
-
-```json
-{
-  "type": "govVote",
-  "data": {
-    "proposalId": 42,
-    "vote": true
-  }
-}
-```
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `proposalId` | `number` | Proposal ID |
-| `vote` | `boolean` | `true` = approve, `false` = reject |
-
-<Note>
-Account and transfer actions like `usdSend`, `withdraw3`, `vaultTransfer`, `tokenDelegate`, and `govVote` are infrequent on mainnet (a few per hour). They are fully formatted with named fields when they do appear.
-</Note>
+| Type | Description |
+|------|-------------|
+| `agentSetAbstraction` | Set account abstraction mode |
+| `userSetAbstraction` | User-initiated abstraction |
+| `startFeeTrial` | Begin a fee trial period |
+| `claimRewards` | Claim staking rewards |
+| `convertToMultiSigUser` | Convert to multi-sig account |
+| `tokenDelegate` | Delegate/undelegate HYPE stake |
+| `withdraw3` | Withdraw to external chain (bridge) |
+| `usdSend` | Internal USDC transfer |
+| `vaultTransfer` | Vault deposit/withdraw |
+| `subAccountTransfer` | Transfer between sub-accounts |
+| `borrowLend` | Borrow or lend action |

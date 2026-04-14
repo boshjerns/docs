@@ -1,76 +1,114 @@
 ---
 title: Subscriptions
-description: Subscribe, unsubscribe, and manage event streams
+description: Subscribe, unsubscribe, and manage your stream
 ---
-
-All messages are JSON text frames.
 
 ## Subscribe
 
-Subscribe to the event stream. Omit `filters` to receive all events (firehose).
+Send a subscribe message to start receiving events:
 
-**Request:**
 ```json
-{
-  "action": "subscribe",
-  "id": "my-subscription",
-  "filters": {
-    "action_types": ["order", "cancel"],
-    "addresses": ["0x1234..."],
-    "assets": ["BTC", "ETH"],
-    "asset_ids": [0, 1]
-  }
-}
+{"action": "subscribe", "filters": {"action_types": ["order", "fill"]}}
 ```
 
-| Field | Required | Description |
-|-------|----------|-------------|
-| `action` | Yes | Must be `"subscribe"` |
-| `id` | No | Client-chosen identifier. Defaults to `"default"`. Used for unsubscribing. |
-| `filters` | No | Filter object. Omit for firehose. See [Filters](/api/filters). |
-
-**Response:**
+Response:
 ```json
-{
-  "action": "subscribed",
-  "id": "my-subscription",
-  "sub_id": 1,
-  "total_subs": 50000
-}
+{"action": "subscribed", "id": "default", "sub_id": 1, "total_subs": 1}
 ```
 
-## Unsubscribe
+## Subscribe with custom ID
 
-**Request:**
-```json
-{
-  "action": "unsubscribe",
-  "id": "my-subscription"
-}
-```
+Give your subscription a name for easier management:
 
-**Response:**
 ```json
-{
-  "action": "unsubscribed",
-  "id": "my-subscription"
-}
+{"action": "subscribe", "id": "btc-orders", "filters": {"action_types": ["order"], "assets": ["BTC"]}}
 ```
 
 ## Multiple subscriptions
 
-You can create multiple subscriptions on a single connection, each with different filters. Each gets its own `sub_id`. Use the `id` field to manage them.
+You can have multiple active subscriptions on one connection. Each gets its own ID:
 
 ```json
-{"action": "subscribe", "id": "btc-orders", "filters": {"assets": ["BTC"], "action_types": ["order"]}}
-{"action": "subscribe", "id": "whale-tracker", "filters": {"addresses": ["0xd071d6d6..."]}}
+{"action": "subscribe", "id": "orders", "filters": {"action_types": ["order", "fill"]}}
+{"action": "subscribe", "id": "btc-cancels", "filters": {"action_types": ["cancel"], "assets": ["BTC"]}}
 ```
 
-Events from all active subscriptions are delivered on the same connection. To stop one stream without disconnecting, unsubscribe by its `id`.
+An event matching multiple subscriptions is sent once (deduplicated per connection).
 
-## Error handling
+## Unsubscribe
 
-Unknown actions return:
 ```json
-{"error": "unknown action"}
+{"action": "unsubscribe", "id": "btc-cancels"}
+```
+
+## Ping/pong
+
+The server sends WebSocket ping frames every 30 seconds. Most libraries handle this automatically. You can also send application-level pings:
+
+```json
+{"action": "ping"}
+```
+
+Response:
+```json
+{"action": "pong"}
+```
+
+## Common subscription patterns
+
+**Everything (firehose):**
+```json
+{"action": "subscribe"}
+```
+~5,000 events/sec on mainnet. Both pre-consensus and confirmed.
+
+**Orders and fills only (recommended for most users):**
+```json
+{"action": "subscribe", "filters": {"action_types": ["order", "fill"]}}
+```
+~200 events/sec. Every order placement and trade execution.
+
+**Track a specific wallet:**
+```json
+{"action": "subscribe", "filters": {"addresses": ["0xd071d6d6ea52f5aa34b79e47f908ee48c8215837"]}}
+```
+Only events from this address. Works across all asset types.
+
+**BTC only:**
+```json
+{"action": "subscribe", "filters": {"assets": ["BTC"]}}
+```
+All event types but only for Bitcoin.
+
+**Pre-consensus signals:**
+```json
+{"action": "subscribe", "filters": {"action_types": ["cancel", "cancelByCloid", "batchModify"]}}
+```
+Cancel and modify actions before they are committed. Arrives ~1 second early.
+
+**Confirmed orders only (no noise):**
+```json
+{"action": "subscribe", "filters": {"action_types": ["order"]}}
+```
+The `"order"` umbrella matches: `order`, `order_filled`, `order_canceled`, `order_rejected`.
+
+**Prediction markets:**
+```json
+{"action": "subscribe", "filters": {"assets": ["#39890"]}}
+```
+Track a specific outcome token.
+
+## Subscription limits
+
+| Tier | Max connections | Max subscriptions |
+|------|----------------|-------------------|
+| free | 1 | 1 |
+| starter | 5 | 50 |
+| growth | 10 | 500 |
+| pro | 150 | 5,000 |
+| enterprise | 500 | 100,000 |
+
+Exceeding your subscription limit returns an error:
+```json
+{"error": "subscription limit reached for growth tier (max 500)"}
 ```
