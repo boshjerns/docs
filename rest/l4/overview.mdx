@@ -1,0 +1,85 @@
+---
+title: L4 Order Book
+sidebarTitle: Overview
+description: Full depth order book with individual orders and wallet addresses
+---
+
+<Note>
+**Exclusive to hypernode.** The public HyperLiquid API only provides L2 order books (top 20 aggregated price levels, no addresses). hypernode gives you **L4**: every individual resting order on every market, with the wallet address that placed it.
+</Note>
+
+## What is L4?
+
+| Level | What you see | Source |
+|-------|-------------|--------|
+| **L2** (public API) | Top 20 price levels, aggregated sizes, no addresses | `api.hyperliquid.xyz` |
+| **L4** (hypernode) | Every individual order: price, size, wallet address, order ID, timestamp | Our non-validator node |
+
+## Why it matters
+
+- **See who is providing liquidity** at every price level
+- **Track specific wallets** across their entire order book
+- **Detect spoofing** — large orders placed and pulled
+- **Measure real depth** — not just aggregated levels but individual order sizes
+- **Build your own L2/L3** by aggregating L4 data however you want
+
+## Scale
+
+On mainnet right now:
+
+- **699 markets** with L4 data
+- **390,000+ individual orders** across all markets
+- **BTC alone: 33,000+ bids, 15,000+ asks**
+- **Refreshed every second** from our local node
+- **Pre-serialized** — responses are built in the background, served instantly
+
+## Endpoints
+
+| Endpoint | Description | Rate limit |
+|----------|-------------|-----------|
+| [`GET /v2/l4book?coin=BTC`](/rest/l4/book) | Full L4 book for one asset | Per-tier L4 limit |
+| [`GET /v2/l4book/summary`](/rest/l4/summary) | All markets with order counts | Per-tier L4 limit |
+
+## Quick example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" \
+  "https://hyper.polynode.dev/v2/l4book?coin=BTC"
+```
+
+Each order in the response:
+
+```json
+{
+  "user": "0xcde682fc64f38967b71cfd00803d4ba3d60e49d1",
+  "coin": "ETH",
+  "side": "A",
+  "limitPx": "2385.5",
+  "sz": "3.6932",
+  "oid": 380856822611,
+  "orderType": "Limit",
+  "tif": "Alo",
+  "timestamp": 1776156995426,
+  "reduceOnly": false
+}
+```
+
+Every field you need: who placed it, at what price, what size, when, and whether it is reduce-only or a trigger order.
+
+## Rate limits
+
+L4 data has its own rate limit, separate from general REST queries:
+
+| Tier | L4 queries/sec | Price |
+|------|---------------|-------|
+| free | 0 (blocked) | $0 |
+| starter | 1 | $50/mo |
+| growth | 5 | $200/mo |
+| pro | 20 | custom |
+| enterprise | 100 | $750/mo |
+
+## Authentication
+
+Same API keys as all hypernode endpoints. Pass via `x-api-key` header or `?key=` query parameter.
+
+[Sign up at polynode.dev](https://polynode.dev) — Growth plan and above includes L4 access.

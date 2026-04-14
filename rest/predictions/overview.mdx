@@ -1,0 +1,92 @@
+---
+title: Prediction Markets
+sidebarTitle: Overview
+description: HIP-4 prediction market data and trading on HyperLiquid
+---
+
+<Note>
+HIP-4 prediction markets are currently on **testnet only**. When they launch on mainnet, all endpoints in this section will return live data. The WebSocket stream will include prediction market events automatically.
+</Note>
+
+## How it works
+
+HyperLiquid's HIP-4 introduces binary outcome markets directly on L1. Each outcome has two tradeable tokens (YES/NO) that settle to 0 or 1.
+
+## Key concepts
+
+### Outcome tokens
+
+Each outcome has two sides, each tradeable as its own token:
+
+| Concept | Format | Example |
+|---------|--------|---------|
+| Outcome ID | integer | `3989` |
+| Side index | `0` (Yes) or `1` (No) | `0` |
+| Coin name | `#{10 * outcome_id + side}` | `#39890` |
+| Asset ID | `100,000,000 + 10 * outcome_id + side` | `100039890` |
+
+### Collateral
+
+Prediction markets use **USDH** (not USDC) as collateral. On mainnet, USDH trades at ~$0.995 (effectively 1:1 with USDC).
+
+To trade prediction markets:
+1. Transfer USDC from perp to spot balance
+2. Buy USDH via the USDH/USDC spot pair
+3. Place orders on outcome tokens using USDH collateral
+
+### Price range
+
+Outcome token prices are bounded between 0.001 and 0.999. A price of 0.75 means the market assigns a 75% probability to that outcome.
+
+### Fees
+
+- **Opening:** Free
+- **Closing on orderbook:** 7.0 bps taker / 4.0 bps maker
+- **Settlement:** 7.0 bps charged in outcome token
+- **Minimum order:** `size * min(markPx, 1-markPx) >= $10 USDH`
+
+## Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| [`GET /v2/prediction/markets`](/rest/predictions/prediction-markets) | All outcomes and questions |
+| `GET /v2/predictions/prices` | Enriched outcome prices (from exchange API) |
+| `GET /v2/predictions/orderbook?outcome=N&side=S` | L2 book for an outcome token |
+| `GET /v2/predictions/trades?outcome=N&side=S` | Recent trades |
+
+## Placing an order
+
+Orders on outcome tokens use the same format as regular orders. The `coin` field uses the `#` notation:
+
+```bash
+# Buy 100 YES tokens for outcome 3989 at price 0.50
+# coin = #39890 (10 * 3989 + 0)
+curl -X POST https://hyper.polynode.dev/v2/order \
+  -H "x-api-key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"action":{"type":"order","orders":[{"a":100039890,"b":true,"p":"0.5","s":"100","r":false,"t":{"limit":{"tif":"Gtc"}}}],"grouping":"na"},"nonce":1234,"signature":{...}}'
+```
+
+## In the stream
+
+Prediction market orders and fills appear in the unified WebSocket stream with a `prediction` metadata object:
+
+```json
+{
+  "type": "order",
+  "consensus": "confirmed",
+  "asset": "#39890",
+  "data": {
+    "coin": "#39890",
+    "side": "B",
+    "px": "0.50",
+    "prediction": {
+      "outcome_id": 3989,
+      "side_index": 0,
+      "asset_id": 100039890
+    }
+  }
+}
+```
+
+Filter for prediction events: `{"action_types": ["order"], "assets": ["#39890"]}`

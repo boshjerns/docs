@@ -1,0 +1,47 @@
+---
+title: Perp Categories
+sidebarTitle: Categories
+description: Every perpetual categorized by asset class
+---
+
+## Endpoint
+
+```
+GET /v2/perp-categories
+```
+
+Returns every perpetual market categorized by asset class. Useful for building filtered UIs.
+
+```json
+[
+  ["flx:BTC", "crypto"],
+  ["flx:COIN", "stocks"],
+  ["flx:COPPER", "commodities"],
+  ["flx:GOLD", "commodities"],
+  ["xyz:TSLA", "stocks"],
+  ["xyz:NVDA", "stocks"],
+  ["xyz:BRENTOIL", "commodities"]
+]
+```
+
+Categories include: `crypto`, `stocks`, `commodities`, and more.
+
+Pre-serialized and cached — 12,000+ requests/sec.
+
+## Annotations
+
+For more detailed metadata:
+
+```
+GET /v2/perp-annotations
+```
+
+Returns annotations with category and display info for each perp.
+
+```json
+[
+  ["flx:BTC", {"category": "crypto"}],
+  ["flx:COIN", {"category": "stocks"}],
+  ["xyz:GOLD", {"category": "commodities"}]
+]
+```

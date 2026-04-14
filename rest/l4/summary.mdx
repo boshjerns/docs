@@ -1,0 +1,68 @@
+---
+title: L4 Summary
+sidebarTitle: Summary
+description: All markets with order counts and best bid/ask
+---
+
+## Endpoint
+
+```
+GET /v2/l4book/summary
+```
+
+Returns a lightweight summary of all markets with total order counts. Use this to discover which markets have the most depth before querying individual L4 books.
+
+## Response
+
+```json
+{
+  "markets": 699,
+  "total_orders": 394315,
+  "height": 958200000,
+  "data": [
+    {
+      "coin": "HYPE",
+      "bid_orders": 35432,
+      "ask_orders": 6462
+    },
+    {
+      "coin": "BTC",
+      "bid_orders": 33807,
+      "ask_orders": 15052
+    },
+    {
+      "coin": "@107",
+      "bid_orders": 19423,
+      "ask_orders": 8599
+    },
+    {
+      "coin": "ETH",
+      "bid_orders": 11490,
+      "ask_orders": 6917
+    }
+  ]
+}
+```
+
+Markets are sorted by total order count (bids + asks) descending.
+
+## Example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" \
+  "https://hyper.polynode.dev/v2/l4book/summary"
+```
+
+```python
+import requests
+
+resp = requests.get(
+    "https://hyper.polynode.dev/v2/l4book/summary",
+    headers={"x-api-key": "pn_live_YOUR_KEY"}
+)
+data = resp.json()
+
+print(f"{data[markets]} markets, {data[total_orders]} total orders")
+for m in data["data"][:10]:
+    print(f"  {m[coin]}: {m[bid_orders]} bids, {m[ask_orders]} asks")
+```

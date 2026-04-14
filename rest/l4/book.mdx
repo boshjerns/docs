@@ -1,0 +1,117 @@
+---
+title: L4 Book
+sidebarTitle: Book
+description: Full depth order book for a single asset
+---
+
+## Endpoint
+
+```
+GET /v2/l4book?coin={symbol}
+```
+
+Returns every individual resting order for the specified asset, including the wallet address of each order.
+
+## Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `coin` | string | Yes | Asset symbol (e.g., `BTC`, `ETH`, `SOL`, `HYPE`) |
+
+## Response
+
+```json
+{
+  "coin": "ETH",
+  "height": 958200000,
+  "bid_count": 11490,
+  "ask_count": 6861,
+  "bids": [
+    {
+      "user": "0x847bd1ef4fede0fe191129894d63044843f4d473",
+      "coin": "ETH",
+      "side": "B",
+      "limitPx": "2384.4",
+      "sz": "5.1598",
+      "oid": 380856822616,
+      "orderType": "Limit",
+      "tif": "Alo",
+      "timestamp": 1776156995426,
+      "reduceOnly": false,
+      "isTrigger": false,
+      "triggerPx": "0.0",
+      "isPositionTpsl": false,
+      "origSz": "5.1598",
+      "cloid": "0x00000000000000000000019d889a29cd"
+    }
+  ],
+  "asks": [
+    {
+      "user": "0xcde682fc64f38967b71cfd00803d4ba3d60e49d1",
+      "coin": "ETH",
+      "side": "A",
+      "limitPx": "2385.5",
+      "sz": "3.6932",
+      "oid": 380856822611,
+      "orderType": "Limit",
+      "tif": "Alo",
+      "timestamp": 1776156995426,
+      "reduceOnly": false,
+      "isTrigger": false,
+      "triggerPx": "0.0",
+      "isPositionTpsl": false,
+      "origSz": "3.698",
+      "cloid": "0x00000000000000000000019d889dc603"
+    }
+  ]
+}
+```
+
+## Order fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `user` | string | Wallet address that placed the order |
+| `coin` | string | Asset symbol |
+| `side` | string | `"B"` = buy/bid, `"A"` = sell/ask |
+| `limitPx` | string | Order price |
+| `sz` | string | Current size (may differ from `origSz` if partially filled) |
+| `origSz` | string | Original order size |
+| `oid` | number | Order ID |
+| `orderType` | string | `"Limit"` or trigger type |
+| `tif` | string | Time in force: `"Alo"`, `"Gtc"`, `"Ioc"` |
+| `timestamp` | number | Unix milliseconds when order was placed |
+| `reduceOnly` | boolean | Whether this is a reduce-only order |
+| `isTrigger` | boolean | Whether this is a trigger/stop order |
+| `triggerPx` | string | Trigger price (if applicable) |
+| `isPositionTpsl` | boolean | Whether this is a position TP/SL |
+| `cloid` | string | Client order ID (if set) |
+
+## Example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" \
+  "https://hyper.polynode.dev/v2/l4book?coin=BTC"
+```
+
+```typescript
+const resp = await fetch("https://hyper.polynode.dev/v2/l4book?coin=BTC", {
+  headers: { "x-api-key": "pn_live_YOUR_KEY" }
+});
+const book = await resp.json();
+
+console.log(`BTC: ${book.bid_count} bids, ${book.ask_count} asks`);
+
+// Find the largest bid
+const biggestBid = book.bids.reduce((max, o) =>
+  parseFloat(o.sz) > parseFloat(max.sz) ? o : max
+);
+console.log(`Largest bid: ${biggestBid.sz} @ ${biggestBid.limitPx} by ${biggestBid.user}`);
+```
+
+## Notes
+
+- Response size for BTC is ~15MB (33,000+ orders). Use compression (`Accept-Encoding: gzip`).
+- Data refreshes every 1 second from our local node.
+- Trigger orders that have not been activated are **not included**.
+- Spot order books are **not included** in the current version.

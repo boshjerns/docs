@@ -43,7 +43,7 @@
             ]
           },
           {
-            "group": "Action Types",
+            "group": "Event Types",
             "pages": [
               "actions/overview",
               "actions/trading",
@@ -69,16 +69,18 @@
             ]
           },
           {
-            "group": "Trading",
+            "group": "L4 Order Book",
+            "badge": "Exclusive",
             "pages": [
-              "rest/trading/authentication",
-              "rest/trading/orders",
-              "rest/trading/account"
+              "rest/l4/overview",
+              "rest/l4/book",
+              "rest/l4/summary"
             ]
           },
           {
             "group": "Market Data",
             "pages": [
+              "rest/market-data/meta",
               "rest/market-data/prices",
               "rest/market-data/orderbook",
               "rest/market-data/trades",
@@ -105,9 +107,18 @@
             ]
           },
           {
+            "group": "DeFi",
+            "badge": "New",
+            "pages": [
+              "rest/defi/borrow-lend",
+              "rest/defi/priority-auction"
+            ]
+          },
+          {
             "group": "Discovery",
             "pages": [
               "rest/discovery/assets",
+              "rest/discovery/perp-categories",
               "rest/discovery/spot-pairs",
               "rest/discovery/perp-auction",
               "rest/discovery/spot-auction"
@@ -116,8 +127,17 @@
           {
             "group": "Prediction Markets",
             "pages": [
+              "rest/predictions/overview",
               "rest/predictions/prediction-markets",
               "rest/predictions/prediction-market"
+            ]
+          },
+          {
+            "group": "Trading",
+            "pages": [
+              "rest/trading/authentication",
+              "rest/trading/orders",
+              "rest/trading/account"
             ]
           },
           {
@@ -193,11 +213,23 @@
         "label": "polynode.dev",
         "href": "https://polynode.dev"
       }
-    ]
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Get API Key",
+      "href": "https://polynode.dev"
+    }
   },
   "footer": {
     "socials": {
       "x": "https://x.com/joinPolynode"
+    }
+  },
+  "api": {
+    "baseUrl": "https://hyper.polynode.dev",
+    "auth": {
+      "method": "key",
+      "name": "x-api-key"
     }
   }
 }

@@ -1,116 +1,63 @@
 ---
-title: REST API Overview
-description: Trading, market data, and account management endpoints for HyperLiquid
+title: REST API
+sidebarTitle: Overview
+description: 54 endpoints for market data, user state, L4 order books, DeFi, and trading
 ---
 
-The hypernode REST API provides endpoints for trading, market data, and account management on HyperLiquid. No SDK required. Works from any language that can make HTTP requests.
+## Base URL
 
-**Base URL:** `https://hyper.polynode.dev/exchange`
+```
+https://hyper.polynode.dev/v2/
+```
 
-**Interactive docs (Swagger UI):** [`/exchange/docs`](https://hyper.polynode.dev/exchange/docs)
+All endpoints require an API key via `x-api-key` header or `?key=` query parameter.
 
-## Categories
+## Three tiers of speed
 
-<CardGroup cols={2}>
-  <Card title="Trading" icon="arrow-right-arrow-left" href="/rest/trading/orders">
-    Place, cancel, and modify orders. Market open/close with slippage protection.
+hypernode serves data from three sources, each with different performance characteristics:
+
+<CardGroup cols={3}>
+  <Card title="Pre-serialized" icon="bolt">
+    15 endpoints. Data cached in memory, refreshed every 1-60 seconds. **12,000+ req/sec.** L4 order book, market metadata, DeFi rates.
   </Card>
-  <Card title="Account" icon="wallet" href="/rest/trading/account">
-    Positions, fills, balances, fees, and portfolio for your registered wallet.
+  <Card title="Local node" icon="server">
+    22 endpoints. Queries our local HyperLiquid node directly. **4ms latency.** User state, positions, open orders, fees.
   </Card>
-  <Card title="Market Data" icon="chart-line" href="/rest/market-data/prices">
-    Prices, orderbook, trades, candles, funding, tickers, stats.
-  </Card>
-  <Card title="User Data" icon="user" href="/rest/user-data/user">
-    Look up any wallet's state, orders, fills, staking, and more.
-  </Card>
-  <Card title="Discovery" icon="compass" href="/rest/discovery/assets">
-    Assets, spot pairs, validators, vaults, prediction markets, auctions.
-  </Card>
-  <Card title="Passthrough" icon="arrow-right-arrow-left" href="/rest/passthrough/info">
-    Forward any request directly to HyperLiquid's API.
+  <Card title="External proxy" icon="globe">
+    17 endpoints. Proxied to HyperLiquid API for data not available locally. L2 orderbook, candles, trade history.
   </Card>
 </CardGroup>
 
-## Network selection
+## Exclusive features
 
-All endpoints accept a `network` query parameter:
+| Feature | Description | Who has it |
+|---------|-------------|-----------|
+| [L4 Order Book](/rest/l4/overview) | Every individual order with wallet address | **Only hypernode** |
+| [Priority Auction](/rest/defi/priority-auction) | MEV data: gossip priority bidding | **Only hypernode** |
+| [Borrow/Lend Rates](/rest/defi/borrow-lend) | Real-time reserve states | From our local node |
+| [Perp Categories](/rest/discovery/perp-categories) | Asset classification (crypto/stocks/commodities) | From our local node |
+| [Prediction Markets](/rest/predictions/overview) | HIP-4 outcome trading (testnet) | Convenience endpoints |
 
-| Value | Description |
-|-------|-------------|
-| `mainnet` | HyperLiquid production (default) |
-| `testnet` | HyperLiquid testnet |
+## Rate limits
 
-```bash
-curl https://hyper.polynode.dev/exchange/prices?network=testnet
-```
+| Tier | REST req/sec | L4 req/sec | Price |
+|------|-------------|-----------|-------|
+| free | 2 | 0 | $0 |
+| starter | 10 | 1 | $50/mo |
+| growth | 30 | 5 | $200/mo |
+| pro | 100 | 20 | custom |
+| enterprise | 500 | 100 | $750/mo |
 
 ## Authentication
 
-Endpoints fall into three categories:
-
-### Public endpoints (no auth)
-
-Market data, user lookups, and discovery endpoints are fully public.
+Same API keys as the WebSocket stream. Keys are prefixed with `pn_live_`.
 
 ```bash
-curl https://hyper.polynode.dev/exchange/prices
-curl "https://hyper.polynode.dev/exchange/user/state?address=0x1234..."
+# Via header
+curl -H "x-api-key: pn_live_YOUR_KEY" "https://hyper.polynode.dev/v2/meta"
+
+# Via query param
+curl "https://hyper.polynode.dev/v2/meta?key=pn_live_YOUR_KEY"
 ```
 
-### Authenticated endpoints (trading + account)
-
-Endpoints that place orders or read your private account data require authentication. There are two options:
-
-**Option 1: Register your wallet and use an API key**
-
-Register once, then use the key for all future requests. Your private key is encrypted at rest using Fernet encryption, never logged, and never leaves the server.
-
-```bash
-# Register (one-time)
-curl -X POST https://hyper.polynode.dev/exchange/register \
-  -H "Content-Type: application/json" \
-  -d '{"private_key": "0xYOUR_KEY", "network": "mainnet"}'
-# Returns: {"api_key": "hn_abc123...", "address": "0x...", "network": "mainnet"}
-
-# Use the key
-curl https://hyper.polynode.dev/exchange/positions \
-  -H "X-API-Key: hn_abc123..."
-```
-
-**Option 2: Pass your private key per-request**
-
-Stateless. Nothing is stored.
-
-```bash
-curl -X POST https://hyper.polynode.dev/exchange/order \
-  -H "X-HL-Private-Key: 0xYOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"coin": "BTC", "side": "buy", "size": 0.001, "price": 50000}'
-```
-
-See [Authentication](/rest/trading/authentication) for full details.
-
-### Pre-signed passthrough
-
-If you handle EIP-712 signing yourself, forward the signed payload directly:
-
-```bash
-curl -X POST https://hyper.polynode.dev/exchange/raw \
-  -H "Content-Type: application/json" \
-  -d '{"action": {...}, "nonce": 123, "signature": {...}}'
-```
-
-## Error format
-
-All errors return JSON with an `error` field:
-
-```json
-{"error": "No mid price for FAKECOIN"}
-```
-
-| Status | Meaning |
-|--------|---------|
-| 400 | Bad request (invalid parameters, missing coin, etc.) |
-| 401 | Missing or invalid API key |
-| 404 | Resource not found |
+[Sign up at polynode.dev](https://polynode.dev) to get an API key.

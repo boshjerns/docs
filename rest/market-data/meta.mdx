@@ -1,0 +1,68 @@
+---
+title: Market Metadata
+sidebarTitle: Metadata
+description: All perpetual and spot market metadata
+---
+
+## Perp metadata
+
+```
+GET /v2/meta
+```
+
+Returns all 229 perpetual markets with size decimals, max leverage, and margin table.
+
+```json
+{
+  "universe": [
+    {
+      "name": "BTC",
+      "szDecimals": 5,
+      "maxLeverage": 40,
+      "marginTableId": 56
+    },
+    {
+      "name": "ETH",
+      "szDecimals": 4,
+      "maxLeverage": 25,
+      "marginTableId": 55
+    }
+  ]
+}
+```
+
+Pre-serialized. Refreshed every 60 seconds. 12,000+ req/sec.
+
+## Spot metadata
+
+```
+GET /v2/spot-meta
+```
+
+Returns all 291 spot pairs with token info.
+
+## All perp metadata (including builder-deployed)
+
+```
+GET /v2/all-perp-metas
+```
+
+Returns metadata for ALL perps including builder-deployed dexes (xyz, flx, km, cash, etc.) in one call. Includes 229 mainnet perps + 161 builder-deployed perps.
+
+## Builder-deployed dexes
+
+```
+GET /v2/perp-dexes
+```
+
+Returns all 8 builder-deployed perpetual dexes with deployer info.
+
+```json
+[
+  null,
+  {"name": "xyz", "fullName": "XYZ", "deployer": "0x88806a71d74a..."},
+  {"name": "flx", "deployer": "0x2fab552502a6..."},
+  {"name": "km", "deployer": "0x71f0019cc7fa..."},
+  {"name": "cash", "deployer": "0xffa8198c62ad..."}
+]
+```

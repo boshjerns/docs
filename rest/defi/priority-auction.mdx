@@ -1,0 +1,38 @@
+---
+title: Priority Auction
+sidebarTitle: Priority Auction
+description: Gossip priority transaction auction status — MEV data
+---
+
+<Note>
+This data shows who is bidding for priority transaction inclusion on HyperLiquid. Useful for MEV research and understanding block construction.
+</Note>
+
+## Endpoint
+
+```
+GET /v2/gossip-priority-auction
+```
+
+Returns the current state of the gossip priority auction. Refreshed every 5 seconds.
+
+```json
+[
+  [null, null, null, null, null],
+  [{
+    "startTimeSeconds": 1776156480,
+    "durationSeconds": 180,
+    "startGas": "0.1",
+    "endGas": "10.0"
+  }]
+]
+```
+
+## What is the priority auction?
+
+HyperLiquid allows users to bid for priority transaction ordering via `gossipPriorityBid` actions. This endpoint shows the current auction parameters: when it started, how long it runs, and the gas price range.
+
+This is relevant for:
+- **MEV research** — who is paying for priority inclusion
+- **Trading strategies** — understanding when priority bidding is active
+- **Block analysis** — correlating priority bids with block construction

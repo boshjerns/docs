@@ -1,0 +1,46 @@
+---
+title: Borrow & Lend
+sidebarTitle: Borrow/Lend
+description: Real-time borrow and supply rates for all lending reserves
+---
+
+## Endpoints
+
+### All reserves
+
+```
+GET /v2/borrow-lend/reserves
+```
+
+Returns all lending reserve states with current borrow and supply rates.
+
+```json
+[
+  [0, {
+    "borrowYearlyRate": "0.05",
+    "supplyYearlyRate": "0.014090",
+    "totalBorrow": "28543210.45",
+    "totalSupply": "102345678.90"
+  }],
+  [1452, {
+    "borrowYearlyRate": "0.03",
+    "supplyYearlyRate": "0.008"
+  }]
+]
+```
+
+Token 0 = USDC, Token 1452 = USDH. Refreshed every 30 seconds.
+
+### Single reserve
+
+```
+GET /v2/borrow-lend/reserve?token={id}
+```
+
+### User positions
+
+```
+GET /v2/user/borrow-lend?address={wallet}
+```
+
+Returns a user's borrow/lend positions and health factor.
