@@ -1,153 +1,129 @@
 ---
-title: Quickstart
-description: Get started with hypernode's real-time stream or exchange API
+title: Stream Quickstart
+description: Connect to the hypernode WebSocket stream in 30 seconds
 ---
 
 ## 1. Get an API key
 
-Get an API key to start streaming. Keys are prefixed with `pn_live_`.
+[Sign up at polynode.dev](https://polynode.dev) to get an API key. Keys are prefixed with `pn_live_`.
 
-- **Free tier:** [Sign up at polynode.dev](https://polynode.dev) for a free key (1 connection, 1 subscription)
-- **Paid tiers:** Email [josh@quantish.live](mailto:josh@quantish.live) or book a call at [cal.com/bosh-jerns-vozdcd/15min](https://cal.com/bosh-jerns-vozdcd/15min)
+If you already have a polynode account on the Growth plan ($200/mo) or above, your existing key works on hypernode automatically.
 
-## 2. Connect via WebSocket
+## 2. Connect
 
-Install a WebSocket client library:
-
-<CodeGroup>
-```bash npm
-npm install ws
+```bash
+wscat -c "wss://hyper.polynode.dev/ws?key=pn_live_YOUR_KEY"
 ```
-```bash pip
-pip install websockets
-```
-</CodeGroup>
 
-<CodeGroup>
-```typescript TypeScript
+## 3. Subscribe
+
+Send a subscribe message to start receiving events:
+
+```json
+{"action": "subscribe", "filters": {"action_types": ["order", "fill"]}}
+```
+
+You'll immediately start receiving every new order and fill on HyperLiquid:
+
+```json
+{"type":"order","consensus":"confirmed","asset":"BTC","user":"0x9e74a6a1...",
+ "data":{"coin":"BTC","side":"B","px":"74400.0","sz":"0.20146","oid":380660788366,"tif":"Alo"}}
+
+{"type":"fill","consensus":"confirmed","asset":"HYPE","user":"0x34827044...",
+ "data":{"coin":"HYPE","side":"A","px":"22.608","sz":"442.0","dir":"Close Short","closedPnl":"0.92"}}
+```
+
+## Common subscriptions
+
+**All orders and fills (recommended starting point):**
+```json
+{"action": "subscribe", "filters": {"action_types": ["order", "fill"]}}
+```
+
+**Only BTC activity:**
+```json
+{"action": "subscribe", "filters": {"assets": ["BTC"]}}
+```
+
+**Track a specific wallet across all markets:**
+```json
+{"action": "subscribe", "filters": {"addresses": ["0xd071d6d6ea52f5aa34b79e47f908ee48c8215837"]}}
+```
+
+**Pre-consensus cancels only (early signal):**
+```json
+{"action": "subscribe", "filters": {"action_types": ["cancel", "cancelByCloid", "batchModify"]}}
+```
+
+**Full firehose (everything, ~1,300 events/sec):**
+```json
+{"action": "subscribe"}
+```
+
+## TypeScript
+
+```typescript
 import WebSocket from "ws";
 
-const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=YOUR_KEY");
+const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=pn_live_YOUR_KEY");
 
 ws.on("open", () => {
-  // Subscribe to all events (firehose)
-  ws.send(JSON.stringify({ action: "subscribe" }));
+  ws.send(JSON.stringify({
+    action: "subscribe",
+    filters: { action_types: ["order", "fill"] }
+  }));
 });
 
 ws.on("message", (raw) => {
   const event = JSON.parse(raw.toString());
-  console.log(`[${event.block}] ${event.type} | ${event.user} | ${event.asset}`);
+
+  if (event.type === "fill") {
+    console.log(`FILL: ${event.asset} ${event.data.side === "B" ? "BUY" : "SELL"} ${event.data.sz}@${event.data.px}`);
+    console.log(`  PnL: ${event.data.closedPnl} | Fee: ${event.data.fee} ${event.data.feeToken}`);
+  }
+
+  if (event.type === "order") {
+    console.log(`ORDER: ${event.asset} ${event.data.side === "B" ? "BUY" : "SELL"} ${event.data.sz}@${event.data.px} [${event.data.tif}]`);
+  }
 });
 ```
 
-```python Python
-import asyncio, json, websockets
+## Python
 
-async def stream():
-    uri = "wss://hyper.polynode.dev/ws?key=YOUR_KEY"
-    async with websockets.connect(uri) as ws:
-        await ws.send(json.dumps({"action": "subscribe"}))
-        async for message in ws:
-            event = json.loads(message)
-            print(f"[{event['block']}] {event['type']} | {event.get('user', '?')} | {event.get('asset', '')}")
+```python
+import json
+import websocket
 
-asyncio.run(stream())
+def on_message(ws, message):
+    event = json.loads(message)
+    if "action" in event:
+        return  # subscription ack
+
+    if event["type"] == "fill":
+        d = event["data"]
+        print(f"FILL: {event['asset']} {d['sz']}@{d['px']} {d['dir']} PnL={d['closedPnl']}")
+
+    if event["type"] == "order":
+        d = event["data"]
+        print(f"ORDER: {event['asset']} {d['side']} {d['sz']}@{d['px']} [{d['tif']}]")
+
+def on_open(ws):
+    ws.send(json.dumps({
+        "action": "subscribe",
+        "filters": {"action_types": ["order", "fill"]}
+    }))
+
+ws = websocket.WebSocketApp(
+    "wss://hyper.polynode.dev/ws?key=pn_live_YOUR_KEY",
+    on_open=on_open,
+    on_message=on_message,
+)
+ws.run_forever()
 ```
-</CodeGroup>
-
-## 3. Apply filters
-
-Don't need every event? Subscribe with filters.
-
-```json
-{
-  "action": "subscribe",
-  "filters": {
-    "action_types": ["cancel", "cancelByCloid"],
-    "assets": ["BTC", "ETH"]
-  }
-}
-```
-
-This delivers only BTC and ETH cancel events. Cancels make up ~95% of mainnet traffic. See [Filters](/api/filters) for all options.
-
-## 4. Check it's working
-
-You should see events flowing immediately. On mainnet, expect 2,000-4,000+ actions per second. Each event looks like:
-
-```json
-{
-  "block": 70785135,
-  "timestamp": 1774926476708,
-  "type": "cancelByCloid",
-  "user": "0xadca00000001ad3fb20000000002b67426c04500",
-  "asset": "FLY",
-  "asset_id": 187,
-  "data": {
-    "cancels": [{"asset": 187, "cloid": "0x000000334e474c3733393636484b5355"}]
-  },
-  "network": "mainnet"
-}
-```
-
----
-
-## Exchange API quickstart
-
-Trade on HyperLiquid with REST endpoints. No SDK needed.
-
-### 1. Register your wallet
-
-```bash
-curl -X POST https://hyper.polynode.dev/exchange/register \
-  -H "Content-Type: application/json" \
-  -d '{"private_key": "0xYOUR_HL_PRIVATE_KEY", "network": "testnet"}'
-```
-
-Returns: `{"api_key": "hn_a1b2c3d4e5f6...", "address": "0x...", "network": "testnet"}`
-
-<Tip>
-Start with `"network": "testnet"` to test safely before using mainnet.
-</Tip>
-
-### 2. Place an order
-
-```bash
-curl -X POST https://hyper.polynode.dev/exchange/order \
-  -H "X-API-Key: hn_a1b2c3d4e5f6..." \
-  -H "Content-Type: application/json" \
-  -d '{"coin": "BTC", "side": "buy", "size": 0.001, "price": 50000}'
-```
-
-### 3. Check your positions
-
-```bash
-curl https://hyper.polynode.dev/exchange/positions \
-  -H "X-API-Key: hn_a1b2c3d4e5f6..."
-```
-
-### 4. Query market data (no auth needed)
-
-```bash
-curl https://hyper.polynode.dev/exchange/prices
-curl "https://hyper.polynode.dev/exchange/orderbook?coin=BTC"
-```
-
----
 
 ## Next steps
 
-<CardGroup cols={2}>
-  <Card title="Subscriptions" icon="filter" href="/api/subscriptions">
-    Subscribe, unsubscribe, and manage multiple streams
-  </Card>
-  <Card title="Action Types" icon="list" href="/actions/overview">
-    All 53 decoded action types with example payloads
-  </Card>
-  <Card title="Orders" icon="arrow-right-arrow-left" href="/rest/trading/orders">
-    Place, cancel, and modify orders
-  </Card>
-  <Card title="Market Data" icon="chart-line" href="/rest/market-data/prices">
-    Prices, orderbook, funding, trades, and candles
-  </Card>
-</CardGroup>
+- [Event Format](/api/events) — all fields and event types
+- [Filters](/api/filters) — narrow the stream to exactly what you need
+- [Authentication](/api/authentication) — API key tiers and limits
+- [Exchange API](/rest/overview) — REST endpoints for trading and market data

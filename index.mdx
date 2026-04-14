@@ -5,32 +5,28 @@ description: Real-time HyperLiquid data stream and exchange API, by polynode
 
 # hypernode
 
-Two products for building on HyperLiquid: a real-time L1 transaction stream and a language-agnostic exchange API.
+Every order, fill, and cancellation on HyperLiquid, streamed in real-time through one WebSocket. Two consensus layers merged into a single feed.
 
 <CardGroup cols={3}>
-  <Card title="+1s" icon="bolt">
-    Median advantage over HL's public API
+  <Card title="Two layers" icon="layer-group">
+    Pre-consensus gossip + confirmed node data in one stream
   </Card>
   <Card title="100%" icon="check">
-    Asset name and user address coverage
+    Every order, fill, cancel, rejection — nothing missing
   </Card>
-  <Card title="53" icon="layer-group">
-    Decoded action types including HIP-4
+  <Card title="Filtered" icon="filter">
+    Subscribe to exactly what you need by type, asset, or wallet
   </Card>
 </CardGroup>
 
-## Latency advantage
+## The unified stream
 
-hypernode delivers transaction data ~1 second before HyperLiquid's own public API. The live proof on [hyper.polynode.dev](https://hyper.polynode.dev) measures this in your browser by comparing our stream against HL's official WebSocket.
+hypernode merges two data sources that nobody else combines:
 
-## What you get
+- **Pre-consensus** — cancel and modify actions from the gossip protocol, before validators commit them
+- **Confirmed** — every order placement, fill, cancellation, and rejection from the non-validator node, after block commit
 
-- **Every transaction** on HyperLiquid L1, decoded and enriched
-- **53 decoded action types** with named JSON fields for 22 high-frequency types (order, cancel, modify, TWAP, prediction markets, transfers, governance) and raw passthrough for the remaining 31
-- **Full asset resolution** across 229 perps, 288 spot pairs, all margin variants, and prediction outcomes
-- **Filtered subscriptions** by action type, asset, address, or asset ID
-- **HIP-4 prediction markets** with metadata enrichment (question, expiry, underlying, target price)
-- **Mainnet and testnet** on separate endpoints
+Every event is tagged `consensus: "pre"` or `consensus: "confirmed"` so you always know what you're looking at.
 
 ## Quick start
 
@@ -40,33 +36,57 @@ import WebSocket from "ws";
 const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=YOUR_KEY");
 
 ws.on("open", () => {
-  ws.send(JSON.stringify({ action: "subscribe" }));
+  // Subscribe to all orders and fills
+  ws.send(JSON.stringify({
+    action: "subscribe",
+    filters: { action_types: ["order", "fill"] }
+  }));
 });
 
 ws.on("message", (raw) => {
   const event = JSON.parse(raw.toString());
-  console.log(`[${event.block}] ${event.type} | ${event.user} | ${event.asset}`);
+  console.log(event.consensus, event.type, event.asset, event.data.px);
+  // "confirmed" "order" "BTC" "74400.0"
+  // "confirmed" "fill" "ETH" "2359.7"
 });
 ```
 
+## What's in the stream
+
+| Type | Layer | What it tells you |
+|------|-------|-------------------|
+| `order` | confirmed | New resting limit order with price, size, wallet |
+| `order_filled` | confirmed | Order filled immediately |
+| `order_canceled` | confirmed | Order was canceled |
+| `order_rejected` | confirmed | Order rejected (margin, price, balance) |
+| `fill` | confirmed | Trade execution with PnL, fees, direction |
+| `cancel` | pre | Cancel submitted before block commit |
+| `cancelByCloid` | pre | Cancel by client order ID |
+| `batchModify` | pre | Order modification with new price/size |
+
+Subscribe to `"order"` to get all order lifecycle events. See [Event Format](/api/events) for the complete reference.
+
 ## Exchange API
 
-51 REST endpoints for trading, market data, and account management. No SDK required. Works from any language.
+51 REST endpoints for trading, market data, and account management on HyperLiquid. No SDK required.
 
 ```bash
-# Get all mid prices (no auth needed)
+# Mid prices for every asset
 curl https://hyper.polynode.dev/exchange/prices
 
-# Place a limit order (requires API key)
-curl -X POST https://hyper.polynode.dev/exchange/order \
-  -H "X-API-Key: hn_YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"coin": "BTC", "side": "buy", "size": 0.001, "price": 50000}'
+# BTC orderbook
+curl "https://hyper.polynode.dev/exchange/orderbook?coin=BTC"
 ```
+
+## Authentication
+
+hypernode uses the same API keys as [polynode](https://polynode.dev). If you have a polynode account on the Growth plan or above, your `pn_live_` key works on hypernode automatically.
+
+[Sign up at polynode.dev](https://polynode.dev) to get started.
 
 <CardGroup cols={2}>
   <Card title="Stream Quickstart" icon="bolt" href="/quickstart">
-    Connect to the real-time WebSocket stream
+    Connect and subscribe in 30 seconds
   </Card>
   <Card title="Exchange API" icon="code" href="/rest/overview">
     REST endpoints for trading and market data
