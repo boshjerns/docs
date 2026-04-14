@@ -5,12 +5,14 @@ description: HIP-4 prediction market data and trading on HyperLiquid
 ---
 
 <Note>
-HIP-4 prediction markets are currently on **testnet only**. When they launch on mainnet, all endpoints in this section will return live data. The WebSocket stream will include prediction market events automatically.
+HIP-4 prediction markets are currently on **testnet only**. When they launch on mainnet, all endpoints will return live data automatically. The WebSocket stream will include prediction market events within 60 seconds of launch. hypernode is mainnet-ready.
 </Note>
 
 ## How it works
 
-HyperLiquid's HIP-4 introduces binary outcome markets directly on L1. Each outcome has two tradeable tokens (YES/NO) that settle to 0 or 1.
+HyperLiquid's HIP-4 introduces binary outcome markets directly on L1. Each outcome has two tradeable tokens (YES/NO) that settle to 0 or 1. Outcome tokens trade on **spot rails** using the same CLOB matching engine as regular spot pairs (200K+ orders/sec, ~200ms finality).
+
+USDH is the only collateral. All capital cross-margins with your perp and spot positions in the same account.
 
 ## Key concepts
 
@@ -20,52 +22,149 @@ Each outcome has two sides, each tradeable as its own token:
 
 | Concept | Format | Example |
 |---------|--------|---------|
-| Outcome ID | integer | `3989` |
+| Outcome ID | integer | `4086` |
 | Side index | `0` (Yes) or `1` (No) | `0` |
-| Coin name | `#{10 * outcome_id + side}` | `#39890` |
-| Asset ID | `100,000,000 + 10 * outcome_id + side` | `100039890` |
+| Coin name | `#{10 * outcome_id + side}` | `#40860` |
+| Asset ID | `100,000,000 + 10 * outcome_id + side` | `100040860` |
+
+### Market types
+
+**Binary outcomes** — standalone YES/NO markets (e.g., "Will BTC be above $74,650 by Apr 15?")
+
+**Multi-outcome questions** — a question with multiple outcomes. Each outcome has YES/NO sides. A fallback "Other" outcome absorbs remaining probability. Example: "What will Hypurr eat?" with outcomes Akami, Canned Tuna, Otoro, Other.
+
+**Recurring price binaries** — auto-rolling markets tied to an underlying asset price. Same outcome ID, updated expiry and target each period (daily, 15-min, etc.). Description contains structured metadata:
+
+```
+class:priceBinary|underlying:BTC|expiry:20260415-0300|targetPrice:74650|period:1d
+```
 
 ### Collateral
 
-Prediction markets use **USDH** (not USDC) as collateral. On mainnet, USDH trades at ~$0.995 (effectively 1:1 with USDC).
+Prediction markets use **USDH** (not USDC) as collateral. On mainnet, USDH trades at ~$0.995.
 
-To trade prediction markets:
+To get USDH:
 1. Transfer USDC from perp to spot balance
-2. Buy USDH via the USDH/USDC spot pair
-3. Place orders on outcome tokens using USDH collateral
+2. Buy USDH via the USDH/USDC spot pair (token index 360)
 
-### Price range
+### Settlement
 
-Outcome token prices are bounded between 0.001 and 0.999. A price of 0.75 means the market assigns a 75% probability to that outcome.
+Settlement is automatic. The L1 reads its own mark price and settles every position in one block. No oracle dispute window, no claim button, no waiting.
+
+- **Price binaries:** L1 consensus reads the HyperCore mark price at expiry. If the condition is met, YES settles at 1.0 and NO at 0.0. Otherwise reversed.
+- **Event outcomes:** A resolution oracle posts the result. Single transaction settles all positions.
+
+Settlement fills appear in your fill history with:
+```json
+{
+  "coin": "#40861",
+  "px": "0.0",
+  "side": "A",
+  "dir": "Settlement",
+  "closedPnl": "-10.4",
+  "fee": "0.0",
+  "feeToken": "USDH"
+}
+```
+
+| Field | Settlement value |
+|-------|-----------------|
+| `dir` | `"Settlement"` |
+| `side` | `"A"` (auto) |
+| `px` | `"1.0"` (winner) or `"0.0"` (loser) |
+| `closedPnl` | Your profit/loss in USDH |
+| `fee` | Settlement fee |
 
 ### Fees
 
-- **Opening:** Free
-- **Closing on orderbook:** 7.0 bps taker / 4.0 bps maker
+- **Trading:** Spot fee schedule (outcome tokens trade on spot rails)
 - **Settlement:** 7.0 bps charged in outcome token
 - **Minimum order:** `size * min(markPx, 1-markPx) >= $10 USDH`
+- **Fee token on fills:** The outcome token itself (e.g., `+90`), not USDC/USDH
+
+### Prediction actions in the gossip stream
+
+These HIP-4 actions appear as pre-consensus events:
+
+| Action | Description |
+|--------|-------------|
+| `splitOutcome` | Split USDH into YES + NO tokens for an outcome |
+| `mergeOutcome` | Merge YES + NO tokens back into USDH |
+| `negateOutcome` | Swap YES for NO (or vice versa) |
+| `mergeQuestion` | Merge outcome tokens from a multi-outcome question back into USDH |
+| `userOutcome` | User-specific outcome interaction |
 
 ## Endpoints
 
+### Enriched prices (recommended)
+
+```
+GET /exchange/prediction/prices?network=testnet
+```
+
+Returns all outcome tokens with enriched metadata:
+
+```json
+{
+  "coin": "#40860",
+  "outcome_id": 4086,
+  "side_index": 0,
+  "side_name": "Yes",
+  "outcome_name": "Recurring",
+  "mid_price": "0.615",
+  "price_binary": {
+    "type": "priceBinary",
+    "underlying": "BTC",
+    "expiry": "20260415-0300",
+    "target_price": "74650",
+    "period": "1d"
+  }
+}
+```
+
+For multi-outcome questions, includes `question` and `question_id` fields.
+
+### Other endpoints
+
 | Endpoint | Description |
 |----------|-------------|
-| [`GET /v2/prediction/markets`](/rest/predictions/prediction-markets) | All outcomes and questions |
-| `GET /exchange/prediction/prices` | Enriched outcome prices (from exchange API) |
-| `GET /exchange/prediction/orderbook?outcome=N&side=S` | L2 book for an outcome token |
+| [`GET /v2/prediction/markets`](/rest/predictions/prediction-markets) | Raw outcomeMeta (all outcomes and questions) |
+| `GET /exchange/prediction/outcome?id=N&network=testnet` | Single outcome with both sides, prices, book depth |
+| `GET /exchange/prediction/orderbook?outcome=N&side=S` | L2 orderbook for an outcome token |
 | `GET /exchange/prediction/trades?outcome=N&side=S` | Recent trades |
+| `GET /exchange/prediction/settled?outcome=N` | Settlement status and result |
 
 ## Placing an order
 
-Orders on outcome tokens use the same format as regular orders. The `coin` field uses the `#` notation:
+Use the exchange API with `#` coin notation:
 
 ```bash
-# Buy 100 YES tokens for outcome 3989 at price 0.50
-# coin = #39890 (10 * 3989 + 0)
-curl -X POST https://hyper.polynode.dev/v2/order \
-  -H "x-api-key: YOUR_KEY" \
+curl -X POST https://hyper.polynode.dev/exchange/order \
+  -H "X-API-Key: YOUR_EXCHANGE_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"action":{"type":"order","orders":[{"a":100039890,"b":true,"p":"0.5","s":"100","r":false,"t":{"limit":{"tif":"Gtc"}}}],"grouping":"na"},"nonce":1234,"signature":{...}}'
+  -d '{
+    "coin": "#40860",
+    "side": "buy",
+    "size": 30,
+    "price": 0.40,
+    "type": "limit",
+    "tif": "Gtc"
+  }'
 ```
+
+```json
+{
+  "status": "ok",
+  "response": {
+    "type": "order",
+    "data": {
+      "statuses": [{"resting": {"oid": 51457023364}}]
+    }
+  }
+}
+```
+
+Register your wallet first via `POST /exchange/register` with your private key and `network: "testnet"`.
 
 ## In the stream
 
@@ -75,18 +174,35 @@ Prediction market orders and fills appear in the unified WebSocket stream with a
 {
   "type": "order",
   "consensus": "confirmed",
-  "asset": "#39890",
+  "asset": "#40860",
   "data": {
-    "coin": "#39890",
+    "coin": "#40860",
     "side": "B",
-    "px": "0.50",
+    "px": "0.40",
     "prediction": {
-      "outcome_id": 3989,
+      "outcome_id": 4086,
       "side_index": 0,
-      "asset_id": 100039890
+      "asset_id": 100040860
     }
   }
 }
 ```
 
-Filter for prediction events: `{"action_types": ["order"], "assets": ["#39890"]}`
+Filter for prediction events:
+```json
+{"action": "subscribe", "filters": {"assets": ["#40860"]}}
+```
+
+Settlement events also appear in the stream as fills with `dir: "Settlement"`.
+
+## Testnet markets (live)
+
+| Outcome | Type | Sides | Coin (YES) |
+|---------|------|-------|------------|
+| BTC daily binary | Price binary | Yes/No | `#40860` |
+| HYPE 15-min binary | Price binary | Yes/No | `#41250` |
+| 100m dash | Event | Hypurr/Usain Bolt | `#90` |
+| Akami tuna | Multi-outcome | Yes/No | `#100` |
+| Canned Tuna | Multi-outcome | Yes/No | `#110` |
+| Otoro | Multi-outcome | Yes/No | `#120` |
+| Other (fallback) | Multi-outcome | Yes/No | `#130` |

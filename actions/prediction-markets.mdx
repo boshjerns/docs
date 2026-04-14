@@ -1,142 +1,132 @@
 ---
 title: Prediction Markets (HIP-4)
-description: HIP-4 prediction market actions and metadata enrichment
+description: HIP-4 prediction market actions, settlement, and metadata enrichment
 ---
 
 <Note>
-HIP-4 prediction markets are currently live on **testnet only**. When they launch on mainnet, the same enrichment and action types will be available on the mainnet stream automatically.
+HIP-4 is live on **testnet**. When mainnet launches, hypernode will detect new markets within 60 seconds and start streaming prediction events automatically. No configuration needed.
 </Note>
 
-## Overview
+## Prediction actions in the stream
 
-HyperLiquid's HIP-4 introduces prediction markets to the L1. hypernode captures all prediction market activity in real time, enriched with human-readable metadata.
+Five HIP-4 actions appear as pre-consensus events in the gossip stream:
 
-Prediction markets consist of:
-- **Questions** — A prediction with multiple outcomes (e.g., "Will BTC be above $67,579 on 2026-03-31?")
-- **Outcomes** — Individual tradeable outcome tokens within a question
-- **Price Binaries** — A common type where the prediction is whether an asset exceeds a target price
+| Type | Description | Data |
+|------|-------------|------|
+| `userOutcome` | Order on an outcome token | Outcome asset ID, amount |
+| `splitOutcome` | Split USDH into YES + NO tokens | Outcome ID, amount |
+| `mergeOutcome` | Merge YES + NO back into USDH | Outcome ID, amount |
+| `negateOutcome` | Swap YES for NO (or vice versa) | Outcome ID, amount |
+| `mergeQuestion` | Merge multi-outcome tokens back into USDH | Question ID, amount |
 
-## User actions (5 types)
+### Confirmed events
 
-### userOutcome
-Place an order on an outcome token. Same format as a regular `order` but for prediction market outcomes.
-
-### splitOutcome
-Split a position into individual outcome tokens.
-
-```json
-{
-  "type": "splitOutcome",
-  "data": {
-    "outcomeAssetId": 1900001,
-    "amount": "100.00",
-    "prediction_outcome_id": 1900001,
-    "prediction_name": "BTC > $67,579",
-    "prediction_description": "class:priceBinary|underlying:BTC|expiry:20260331-0300|targetPrice:67579|period:1d",
-    "prediction_sides": ["Yes", "No"],
-    "prediction_question": "Daily Price Binaries",
-    "prediction_underlying": "BTC",
-    "prediction_expiry": "20260331-0300",
-    "prediction_target_price": 67579.0,
-    "prediction_period": "1d"
-  },
-  "network": "testnet"
-}
-```
-
-### mergeOutcome
-Merge outcome tokens back into the underlying. Same structure as `splitOutcome`.
-
-### mergeQuestion
-Merge all outcome tokens for a question.
+Prediction orders and fills appear as regular confirmed events with `#` coin names:
 
 ```json
 {
-  "type": "mergeQuestion",
+  "type": "order",
+  "consensus": "confirmed",
+  "asset": "#40860",
   "data": {
-    "questionId": 42,
-    "amount": "50.00",
-    "prediction_question_id": 42,
-    "prediction_question_name": "Daily Price Binaries",
-    "prediction_question_description": "Will BTC close above the target price?"
-  },
-  "network": "testnet"
+    "coin": "#40860",
+    "side": "B",
+    "px": "0.40",
+    "sz": "30.0",
+    "status": "open",
+    "prediction": {
+      "outcome_id": 4086,
+      "side_index": 0,
+      "asset_id": 100040860
+    }
+  }
 }
 ```
 
-### negateOutcome
-Negate (flip) an outcome position. Same structure as `splitOutcome`.
+The `prediction` object is automatically enriched on every event with a `#` coin.
+
+### Settlement events
+
+When an outcome settles, fills appear with `dir: "Settlement"`:
+
+```json
+{
+  "type": "fill",
+  "consensus": "confirmed",
+  "asset": "#40861",
+  "data": {
+    "coin": "#40861",
+    "px": "0.0",
+    "side": "A",
+    "dir": "Settlement",
+    "closedPnl": "-10.4",
+    "fee": "0.0",
+    "feeToken": "USDH"
+  }
+}
+```
+
+- `px: "1.0"` = this side won (token redeemable for 1 USDH)
+- `px: "0.0"` = this side lost (token worth nothing)
+- `side: "A"` = auto-settlement (not a user trade)
+
+## Subscribing to prediction events
+
+**All prediction market activity:**
+```json
+{
+  "action": "subscribe",
+  "filters": {
+    "action_types": ["userOutcome", "splitOutcome", "mergeOutcome", "mergeQuestion", "negateOutcome"]
+  }
+}
+```
+
+**Track a specific outcome token:**
+```json
+{
+  "action": "subscribe",
+  "filters": {"assets": ["#40860"]}
+}
+```
+
+**Track settlements (filter confirmed fills, check for `dir: "Settlement"`):**
+```json
+{
+  "action": "subscribe",
+  "filters": {"action_types": ["fill"], "assets": ["#40860"]}
+}
+```
 
 ## Metadata enrichment
 
-When a HIP-4 event is streamed, the `data` field is automatically enriched with prediction market metadata. This metadata is fetched from HyperLiquid's API and refreshed every 60 seconds.
-
-### Enrichment fields
+Every prediction event is automatically enriched with metadata from outcomeMeta, refreshed every 60 seconds:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `prediction_outcome_id` | `number` | Outcome asset ID |
-| `prediction_name` | `string` | Human-readable outcome name |
-| `prediction_description` | `string` | Full description |
-| `prediction_sides` | `string[]` | Trading sides (e.g., `["Yes", "No"]`) |
-| `prediction_question` | `string` | Parent question name |
-| `prediction_underlying` | `string` | Underlying asset (price binaries, e.g., `"BTC"`) |
-| `prediction_expiry` | `string` | Expiry date (e.g., `"20260331-0300"`) |
-| `prediction_target_price` | `number` | Target price (price binaries) |
-| `prediction_period` | `string` | Time period (e.g., `"1d"`) |
+| `prediction.outcome_id` | number | Outcome ID |
+| `prediction.side_index` | number | 0 = Yes, 1 = No (or custom sides) |
+| `prediction.asset_id` | number | Full asset ID (100M + encoding) |
 
-Enrichment fields are only present when the outcome/question exists in the metadata cache. New markets created between 60-second refreshes may briefly appear without enrichment.
+The enriched prices endpoint adds more:
 
-## Admin actions (8 types)
+| Field | Description |
+|-------|-------------|
+| `outcome_name` | Human-readable name |
+| `side_name` | "Yes", "No", or custom (e.g., "Hypurr") |
+| `question` | Parent question name (multi-outcome) |
+| `price_binary.underlying` | Underlying asset (e.g., "BTC") |
+| `price_binary.target_price` | Target price |
+| `price_binary.expiry` | Expiry timestamp |
+| `price_binary.period` | Roll period (e.g., "1d", "15m") |
 
-These are emitted when prediction markets are created, modified, or settled by the protocol:
+## Admin events
+
+These appear when markets are created or settled:
 
 | Type | Description |
 |------|-------------|
-| `registerQuestion` | Register a new prediction question |
-| `registerOutcome` | Register a new outcome |
-| `registerNamedOutcome` | Register a named outcome |
-| `registerOutcomeToken` | Register an outcome token |
-| `registerTokensAndStandaloneOutcome` | Register tokens and standalone outcome |
-| `settleOutcome` | Settle a prediction market (resolve the outcome) |
-| `changeOutcomeDescription` | Update an outcome's description |
-| `changeQuestionDescription` | Update a question's description |
-
-## Subscribing to prediction markets
-
-**All user prediction market activity:**
-```json
-{
-  "action": "subscribe",
-  "filters": {
-    "action_types": [
-      "userOutcome", "splitOutcome", "mergeOutcome",
-      "mergeQuestion", "negateOutcome"
-    ]
-  }
-}
-```
-
-**Including admin events (market creation/settlement):**
-```json
-{
-  "action": "subscribe",
-  "filters": {
-    "action_types": [
-      "userOutcome", "splitOutcome", "mergeOutcome",
-      "mergeQuestion", "negateOutcome",
-      "registerQuestion", "registerOutcome", "settleOutcome"
-    ]
-  }
-}
-```
-
-**By specific outcome asset ID:**
-```json
-{
-  "action": "subscribe",
-  "filters": {
-    "asset_ids": [1900001]
-  }
-}
-```
+| `registerQuestion` | New prediction question created |
+| `registerOutcome` | New outcome added |
+| `settleOutcome` | Outcome resolved (triggers settlement fills) |
+| `changeOutcomeDescription` | Outcome metadata updated (e.g., recurring market rolls to new expiry) |
