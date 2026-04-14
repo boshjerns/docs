@@ -1,11 +1,11 @@
 ---
 title: "Funding Rates"
-openapi: "GET /exchange/funding"
+openapi: "GET /v2/funding-rates"
 ---
 
-Returns the full HyperLiquid `metaAndAssetCtxs` response: perpetual metadata and per-asset funding/price/volume context.
+Cross-venue predicted funding rates for every perpetual asset. Compares rates across HyperLiquid, Binance, Bybit, and other venues.
 
-The response is a 2-element array: `[0]` is the universe metadata, `[1]` is an array of per-asset context objects.
+Returns an array of `[asset, venues]` pairs. Each venue provides its predicted funding rate, next funding time, and funding interval.
 
 ## Example
 
@@ -15,24 +15,19 @@ curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/funding-rates
 
 ```json
 [
-  {
-    "universe": [
-      {"szDecimals": 5, "name": "BTC", "maxLeverage": 40, "marginTableId": 56},
-      {"szDecimals": 4, "name": "ETH", "maxLeverage": 25, "marginTableId": 55}
-    ]
-  },
   [
-    {
-      "funding": "0.0000125",
-      "openInterest": "26361.336",
-      "oraclePx": "71040.8",
-      "markPx": "71041.5",
-      "midPx": "71041.5",
-      "prevDayPx": "70180.0",
-      "dayNtlVlm": "234567890.12",
-      "premium": "0.0000098",
-      "impactPxs": ["71039.0", "71043.0"]
-    }
+    "BTC",
+    [
+      ["BinPerp", {"fundingRate": "-0.00088805", "nextFundingTime": 1776096000000, "fundingIntervalHours": 4}],
+      ["HlPerp", {"fundingRate": "-0.0003262298", "nextFundingTime": 1776092400000, "fundingIntervalHours": 1}],
+      ["BybitPerp", {"fundingRate": "0.00003398", "nextFundingTime": 1776096000000, "fundingIntervalHours": 4}]
+    ]
   ]
 ]
 ```
+
+| Field | Description |
+|-------|-------------|
+| `fundingRate` | Predicted rate for next interval (positive = longs pay shorts) |
+| `nextFundingTime` | Unix ms timestamp of next funding settlement |
+| `fundingIntervalHours` | Hours between funding settlements (1 for HL, 4/8 for others) |

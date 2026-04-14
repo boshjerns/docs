@@ -12,24 +12,35 @@ description: Real-time borrow and supply rates for all lending reserves
 GET /v2/borrow-lend/reserves
 ```
 
-Returns all lending reserve states with current borrow and supply rates.
+Returns all lending reserve states with current rates, utilization, and balances.
 
 ```json
 [
   [0, {
     "borrowYearlyRate": "0.05",
-    "supplyYearlyRate": "0.014090",
-    "totalBorrow": "28543210.45",
-    "totalSupply": "102345678.90"
-  }],
-  [1452, {
-    "borrowYearlyRate": "0.03",
-    "supplyYearlyRate": "0.008"
+    "supplyYearlyRate": "0.0137296057",
+    "balance": "25479896.6721659414",
+    "utilization": "0.3051023496",
+    "oraclePx": "1.0",
+    "ltv": "0.0",
+    "totalSupplied": "36667120.8191452399",
+    "totalBorrowed": "11187224.7151357103"
   }]
 ]
 ```
 
-Token 0 = USDC, Token 1452 = USDH. Refreshed every 30 seconds.
+| Field | Description |
+|-------|-------------|
+| `borrowYearlyRate` | Annualized borrow APR |
+| `supplyYearlyRate` | Annualized supply APY |
+| `balance` | Available liquidity |
+| `utilization` | Fraction of supply currently borrowed |
+| `oraclePx` | Oracle price of the token |
+| `ltv` | Loan-to-value ratio |
+| `totalSupplied` | Total deposited supply |
+| `totalBorrowed` | Total outstanding borrows |
+
+Token 0 = USDC, Token 1452 = USDH. Refreshed every 30 seconds from local node.
 
 ### Single reserve
 
