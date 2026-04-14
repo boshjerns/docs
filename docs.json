@@ -25,7 +25,7 @@
             "group": "Understanding the Stream",
             "pages": [
               "guides/consensus-layers",
-              "guides/subscriptions",
+              "guides/choosing-subscriptions",
               "guides/asset-discovery"
             ]
           },
