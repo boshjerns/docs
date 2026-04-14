@@ -1,0 +1,118 @@
+---
+title: Authentication
+description: API keys, tiers, rate limits, and how to authenticate with hypernode
+---
+
+hypernode uses API keys for all access. One key works across both the WebSocket stream and REST API.
+
+## Getting a key
+
+1. [Sign up at polynode.dev](https://polynode.dev) to create an account
+2. Your `pn_live_` API key is generated automatically
+3. The same key works on both polynode (Polymarket data) and hypernode (HyperLiquid data)
+
+If you already have a polynode account on Growth ($200/mo) or above, your existing key works on hypernode automatically.
+
+## Authentication methods
+
+### WebSocket
+
+Pass the key as a query parameter:
+
+```
+wss://hyper.polynode.dev/ws?key=pn_live_YOUR_KEY
+```
+
+### REST API
+
+Pass the key as an HTTP header:
+
+```bash
+curl -H "x-api-key: pn_live_YOUR_KEY" "https://hyper.polynode.dev/v2/meta"
+```
+
+### Exchange API
+
+Same header for trading endpoints:
+
+```bash
+curl -X POST "https://hyper.polynode.dev/exchange/order" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: pn_live_YOUR_KEY" \
+  -d '{"coin": "BTC", ...}'
+```
+
+## Tiers
+
+| Tier | Price | WS Connections | Subscriptions | REST | Exchange |
+|------|-------|----------------|---------------|------|----------|
+| Free | $0 | 1 | 1 | Yes | Yes |
+| Starter | $50/mo | 5 | 50 | Yes | Yes |
+| Growth | $200/mo | 10 | 500 | Yes | Yes |
+| Pro | Custom | 150 | 5,000 | Yes | Yes |
+| Enterprise | $750/mo | 500 | 100,000 | Yes | Yes |
+
+All tiers get access to both the WebSocket stream and REST API. The difference is connection and subscription limits.
+
+## What counts as a connection
+
+Each WebSocket connection is one connection. Opening `wss://hyper.polynode.dev/ws?key=YOUR_KEY` uses one connection slot.
+
+REST API requests do not count against your connection limit.
+
+## What counts as a subscription
+
+Each `subscribe` message creates one subscription. Multiple subscriptions on the same connection each count separately.
+
+```json
+{"action": "subscribe", "filters": {"assets": ["BTC"]}}
+```
+This is 1 subscription.
+
+```json
+{"action": "subscribe", "filters": {"assets": ["BTC"]}}
+{"action": "subscribe", "filters": {"assets": ["ETH"]}}
+```
+This is 2 subscriptions on 1 connection.
+
+## Error responses
+
+### WebSocket handshake errors
+
+| Status | Message | Meaning |
+|--------|---------|---------|
+| 401 | `missing API key — use ?key=pn_live_...` | No key in URL |
+| 401 | `invalid API key` | Key not found |
+| 403 | `API key is disabled` | Key exists but deactivated |
+| 429 | `connection limit reached for this key` | Upgrade tier or close connections |
+
+### Subscription errors
+
+Delivered as JSON messages after connection:
+
+```json
+{"error": "subscription limit reached for free tier (max 1)"}
+```
+
+## REST API rate limits
+
+REST endpoints do not have per-key rate limits. However, the underlying data sources (HyperLiquid API via FireProx) have their own limits. If you hit a 429 response on a REST endpoint, back off for a few seconds.
+
+The L4 order book endpoints (`/v2/l4book`, `/v2/l4summary`) are served from a local cache and have no rate limit.
+
+## Key format
+
+All keys follow the format `pn_live_` followed by a random string:
+
+```
+pn_live_hypernode_demo_7989c989b4eadf8ac7a620c1a23fcfac
+```
+
+Keys are case-sensitive. The SHA-256 hash of the key is used internally for lookup.
+
+## Security
+
+- Keys authenticate your identity but do not grant access to any wallet or funds
+- To trade via the exchange API, you must separately register a wallet using `POST /exchange/register`
+- Keep your API key private. If compromised, contact support for a new key
+- Never embed keys in client-side JavaScript (use a backend proxy instead)

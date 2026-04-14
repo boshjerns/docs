@@ -17,7 +17,24 @@
             "group": "Getting Started",
             "pages": [
               "index",
-              "quickstart"
+              "quickstart",
+              "guides/authentication"
+            ]
+          },
+          {
+            "group": "Understanding the Stream",
+            "pages": [
+              "guides/consensus-layers",
+              "guides/subscriptions",
+              "guides/asset-discovery"
+            ]
+          },
+          {
+            "group": "Building with hypernode",
+            "pages": [
+              "guides/common-patterns",
+              "guides/reconnection",
+              "guides/prediction-trading"
             ]
           },
           {

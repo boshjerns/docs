@@ -1,0 +1,144 @@
+---
+title: Prediction Market Trading
+description: Full guide to trading HIP-4 prediction markets through hypernode
+---
+
+HyperLiquid's prediction markets (HIP-4) let you trade on real-world outcomes. This guide covers the full flow from discovery to settlement.
+
+<Note>
+HIP-4 is currently active on testnet with sample outcomes. Mainnet has 0 outcomes live as of April 2026. This guide works for both networks. The trading flow is identical.
+</Note>
+
+## How predictions work
+
+Each prediction market has multiple outcomes. Each outcome has two sides: YES and NO. These are traded as spot tokens on HyperLiquid's spot rails, not as perpetuals.
+
+- YES tokens are worth $1 if the outcome happens, $0 if not
+- NO tokens are worth $1 if the outcome doesn't happen, $0 if it does
+- Prices reflect the market's probability estimate
+- Settlement is automatic via L1 mark price
+
+## Step 1: Discover available markets
+
+```bash
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/prediction/markets"
+```
+
+Each market returns its outcomes with their encoding numbers.
+
+## Step 2: Understand the asset ID system
+
+Every prediction outcome token has a unique encoding:
+
+```
+encoding = 10 * outcome_id + side_index
+```
+
+Where `side_index` is 0 for YES, 1 for NO.
+
+The coin name uses the `#` prefix: `#39890` means outcome 3989, YES side.
+
+The numeric asset ID is `100,000,000 + encoding`. So `#39890` has asset ID `100,039,890`.
+
+### Examples
+
+| Outcome ID | Side | Encoding | Coin name | Asset ID |
+|-----------|------|----------|-----------|----------|
+| 3989 | YES | 39890 | #39890 | 100,039,890 |
+| 3989 | NO | 39891 | #39891 | 100,039,891 |
+| 3990 | YES | 39900 | #39900 | 100,039,900 |
+
+## Step 3: Get collateral
+
+Prediction markets trade in USDH, not USDC. To get USDH:
+
+1. Transfer USDC to your HyperLiquid spot balance
+2. Buy USDH at the spot pair `@180` (USDH/USDC)
+
+## Step 4: Check the order book
+
+```bash
+# L2 order book for a prediction outcome
+curl -H "x-api-key: YOUR_KEY" \
+  "https://hyper.polynode.dev/exchange/prediction/orderbook?outcome=3989&side=0"
+```
+
+Or use the standard orderbook endpoint with the coin name:
+
+```bash
+curl -H "x-api-key: YOUR_KEY" \
+  "https://hyper.polynode.dev/v2/orderbook?coin=%2339890"
+```
+
+Note: `%23` is the URL-encoded `#` character.
+
+## Step 5: Place an order
+
+Use the exchange API to place orders on prediction tokens. The order format is the same as any HyperLiquid spot order.
+
+```bash
+# Via the exchange API (requires registered wallet)
+curl -X POST "https://hyper.polynode.dev/exchange/order" \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: YOUR_KEY" \
+  -d '{
+    "coin": "#39890",
+    "is_buy": true,
+    "sz": "10",
+    "limit_px": "0.65",
+    "order_type": {"limit": {"tif": "Gtc"}}
+  }'
+```
+
+This places a limit buy for 10 YES tokens at $0.65 each.
+
+## Step 6: Track in the stream
+
+Subscribe to prediction market events in the WebSocket stream:
+
+```json
+{"action": "subscribe", "filters": {"assets": ["#39890"]}}
+```
+
+You'll see orders, fills, and cancellations for this outcome token, tagged with `consensus: "confirmed"`.
+
+```typescript
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  if (event.type === "fill" && event.asset === "#39890") {
+    console.log(`Prediction fill: ${event.data.dir} ${event.data.sz} @ ${event.data.px}`);
+  }
+});
+```
+
+## Step 7: Settlement
+
+When the outcome is determined:
+
+1. The YES token settles at $1, the NO token at $0 (or vice versa)
+2. Settlement is automatic via the L1 mark price
+3. Your position is closed at the settlement price
+4. PnL is credited to your spot balance in USDH
+
+## Convenience endpoints
+
+hypernode provides enriched prediction market endpoints:
+
+| Endpoint | What it returns |
+|----------|----------------|
+| `/v2/prediction/markets` | All prediction markets with outcomes |
+| `/v2/prediction/market?id=N` | Single market details |
+| `/exchange/prediction/prices` | Current prices for all outcome tokens |
+| `/exchange/prediction/orderbook?outcome=N&side=S` | L2 book for one outcome side |
+| `/exchange/prediction/trades?outcome=N&side=S` | Recent trades |
+| `/exchange/prediction/settled?outcome=N` | Settlement result |
+
+## Testnet
+
+To experiment with prediction trading on testnet:
+
+1. Get testnet USDC from the [HyperLiquid testnet faucet](https://app.hyperliquid-testnet.xyz/faucet)
+2. Connect to the testnet stream: `wss://hyper.polynode.dev/ws-testnet?key=YOUR_KEY`
+3. Use the exchange API with `network=testnet` parameter
+
+Testnet currently has sample outcomes for testing the full trading flow.

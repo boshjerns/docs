@@ -1,0 +1,187 @@
+---
+title: Choosing Your Subscription
+description: Pick the right filters for your use case
+---
+
+Every WebSocket connection starts with a subscribe message. The filters you choose determine which events you receive. This guide maps common use cases to the exact subscription you need.
+
+## The subscribe message
+
+```json
+{"action": "subscribe", "filters": {"action_types": [...], "assets": [...], "addresses": [...]}}
+```
+
+All filter dimensions use AND logic. An event must match all filters you specify.
+
+- **`action_types`** — which event types (order, fill, cancel, etc.)
+- **`assets`** — which assets by name ("BTC", "ETH", "@142", "#39890")
+- **`addresses`** — which wallets by address
+- **`asset_ids`** — which assets by numeric ID
+
+Omit a filter to match everything on that dimension.
+
+## By use case
+
+### Whale tracking
+
+See every order placed on HyperLiquid. Filter client-side by notional size.
+
+```json
+{"action": "subscribe", "filters": {"action_types": ["order"]}}
+```
+
+The umbrella type `"order"` matches: `order`, `order_filled`, `order_canceled`, `order_rejected`. Filter client-side for `event.type === "order"` and `notional > threshold`.
+
+**Volume:** ~2,000 events/sec across all assets.
+
+### Track a specific wallet
+
+Follow everything one address does across both consensus layers.
+
+```json
+{"action": "subscribe", "filters": {"addresses": ["0xd071d6d6ea52f5aa34b79e47f908ee48c8215837"]}}
+```
+
+Returns all event types: orders, fills, cancels.
+
+**Volume:** depends on activity. Most wallets produce <10 events/sec.
+
+### Copy trading
+
+Only care about when your target wallet executes a trade.
+
+```json
+{
+  "action": "subscribe",
+  "filters": {
+    "addresses": ["0xd071d6d6ea52f5aa34b79e47f908ee48c8215837"],
+    "action_types": ["fill"]
+  }
+}
+```
+
+**Volume:** typically <1 event/sec per wallet.
+
+### Market making signals
+
+Pre-consensus cancels and modifications tell you the order book is about to change.
+
+```json
+{
+  "action": "subscribe",
+  "filters": {
+    "action_types": ["cancel", "cancelByCloid", "batchModify"],
+    "assets": ["BTC"]
+  }
+}
+```
+
+A burst of cancels on one side means a market maker is pulling quotes. The book will thin out in ~1-2 seconds.
+
+**Volume:** ~200-500 events/sec for BTC.
+
+### All activity on one asset
+
+Every order, fill, cancel, and modify on BTC across both consensus layers.
+
+```json
+{"action": "subscribe", "filters": {"assets": ["BTC"]}}
+```
+
+**Volume:** ~300-600 events/sec for BTC.
+
+### Multi-asset dashboard
+
+Track multiple assets. Send separate subscribe messages on the same connection.
+
+```json
+{"action": "subscribe", "filters": {"assets": ["BTC"], "action_types": ["order", "fill"]}}
+```
+```json
+{"action": "subscribe", "filters": {"assets": ["ETH"], "action_types": ["order", "fill"]}}
+```
+```json
+{"action": "subscribe", "filters": {"assets": ["SOL"], "action_types": ["order", "fill"]}}
+```
+
+Each subscription counts toward your tier's limit.
+
+### Liquidation monitoring
+
+Watch for margin rejections across all assets.
+
+```json
+{"action": "subscribe", "filters": {"action_types": ["order"]}}
+```
+
+Filter client-side for `event.type === "order_rejected"` and check `event.data.status` for:
+- `perpMarginRejected`
+- `reduceOnlyRejected`
+- `insufficientSpotBalanceRejected`
+
+A cluster of rejections on one wallet often precedes a liquidation.
+
+### Prediction markets
+
+Track a specific outcome token.
+
+```json
+{"action": "subscribe", "filters": {"assets": ["#39890"]}}
+```
+
+The `#` prefix followed by the encoding number identifies prediction market outcome tokens. See [Asset Discovery](/guides/asset-discovery) for how to find these.
+
+### Full firehose
+
+Everything. Both consensus layers, all assets, all wallets.
+
+```json
+{"action": "subscribe"}
+```
+
+~6,500 events/sec. Only recommended for Growth tier and above. Free tier is limited to 1 subscription.
+
+## Multiple subscriptions
+
+You can send multiple subscribe messages on one connection. Each creates a separate subscription. Events matching any subscription are delivered (OR logic between subscriptions).
+
+```typescript
+// Subscribe to BTC fills AND track a specific wallet
+ws.send(JSON.stringify({
+  action: "subscribe",
+  filters: {assets: ["BTC"], action_types: ["fill"]}
+}));
+
+ws.send(JSON.stringify({
+  action: "subscribe",
+  filters: {addresses: ["0xabc..."]}
+}));
+```
+
+Check your tier's subscription limit in [Authentication](/api/authentication).
+
+## Unsubscribe
+
+Remove a subscription by sending the same filters with `action: "unsubscribe"`:
+
+```json
+{"action": "unsubscribe", "filters": {"assets": ["BTC"], "action_types": ["fill"]}}
+```
+
+## Decision tree
+
+```
+What do you need?
+|
++-- Track a wallet?
+|   +-- Just their trades? --> addresses + action_types: ["fill"]
+|   +-- Everything?        --> addresses only
+|
++-- Track an asset?
+|   +-- Orders + fills?    --> assets + action_types: ["order", "fill"]
+|   +-- Early cancel signal? --> assets + action_types: ["cancel", "batchModify"]
+|
++-- All liquidation signals? --> action_types: ["order"], filter client-side
++-- Prediction markets?      --> assets: ["#encoding"]
++-- Everything?              --> no filters (firehose)
+```

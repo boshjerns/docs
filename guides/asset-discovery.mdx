@@ -1,0 +1,156 @@
+---
+title: Asset Discovery
+description: How to find every asset tradeable on HyperLiquid — perps, spot, builder DEXes, and predictions
+---
+
+HyperLiquid has multiple asset classes spread across different endpoints. This guide shows you how to discover everything you can trade and stream.
+
+## Asset classes
+
+| Class | Count | ID range | Coin format | Endpoint |
+|-------|-------|----------|-------------|----------|
+| Perpetuals | 229 | 0-999 | `BTC`, `ETH`, `SOL` | `/v2/meta` |
+| Spot pairs | 291 | 10000+ | `@142`, `@1` | `/v2/spot-meta` |
+| Builder DEXes | 330+ | varies by DEX | `BTC`, `ETH` (same names) | `/v2/perp-dexes` |
+| Predictions (HIP-4) | varies | 100,000,000+ | `#39890`, `#39891` | `/v2/prediction/markets` |
+
+## Perpetuals
+
+The main 229 assets on HyperLiquid's native perp exchange.
+
+```bash
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/meta"
+```
+
+Response includes every perp with its asset ID, max leverage, and funding parameters:
+
+```json
+{
+  "universe": [
+    {"name": "BTC", "szDecimals": 5, "maxLeverage": 50},
+    {"name": "ETH", "szDecimals": 4, "maxLeverage": 50},
+    {"name": "SOL", "szDecimals": 2, "maxLeverage": 20}
+  ]
+}
+```
+
+Asset IDs are assigned by array position: BTC=0, ETH=1, etc.
+
+## Spot pairs
+
+291 spot trading pairs.
+
+```bash
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/spot-meta"
+```
+
+Spot coins use the `@` prefix followed by their token index: `@1` is PURR, `@142` is HYPE.
+
+```json
+{
+  "tokens": [
+    {"name": "USDC", "index": 0, "szDecimals": 2},
+    {"name": "PURR", "index": 1, "szDecimals": 0}
+  ],
+  "universe": [
+    {"name": "PURR/USDC", "tokens": [1, 0], "index": 10000}
+  ]
+}
+```
+
+## Builder DEXes (HIP-3)
+
+HyperLiquid allows anyone to deploy their own perpetual DEX on top of the L1. There are currently 9 builder DEXes with 330+ assets combined.
+
+```bash
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/perp-dexes"
+```
+
+| DEX | Code | Assets | Focus |
+|-----|------|--------|-------|
+| HyperLiquid native | — | 229 | Main exchange |
+| xyz / XYZ | xyz | 63 | Extended markets |
+| flx / Felix | flx | 16 | Select markets |
+| vntl / Ventuals | vntl | 14 | — |
+| hyna / HyENA | hyna | 25 | — |
+| km / Kinetiq | km | 23 | — |
+| abcd / ABCDEx | abcd | 1 | — |
+| cash / dreamcash | cash | 16 | — |
+| para / Paragon | para | 3 | — |
+
+Builder DEX assets use the same coin names as the native exchange (BTC, ETH, etc.) but trade on a different matching engine with separate order books. The DEX code prefix identifies which exchange.
+
+To get details on a specific DEX:
+
+```bash
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/perp-dex-status?dex=xyz"
+```
+
+## Prediction markets (HIP-4)
+
+HyperLiquid's prediction market system uses a unique asset ID scheme.
+
+```bash
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/prediction/markets"
+```
+
+### Understanding prediction asset IDs
+
+Each prediction market outcome has an encoding number:
+
+```
+encoding = 10 * outcome_id + side_index
+```
+
+- `outcome_id` — the outcome being bet on
+- `side_index` — 0 for YES, 1 for NO
+
+The coin name is `#` followed by the encoding: `#39890` means outcome 3989, YES side.
+
+The asset ID is `100,000,000 + encoding`.
+
+### Subscribing to prediction events
+
+```json
+{"action": "subscribe", "filters": {"assets": ["#39890"]}}
+```
+
+See [Prediction Trading](/guides/prediction-trading) for the full trading flow.
+
+## Asset categories
+
+Group assets by category (crypto, stocks, commodities, etc.):
+
+```bash
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/perp-categories"
+```
+
+## Using asset IDs in subscriptions
+
+You can filter the WebSocket stream by asset name or numeric ID:
+
+```json
+{"action": "subscribe", "filters": {"assets": ["BTC"]}}
+```
+
+```json
+{"action": "subscribe", "filters": {"asset_ids": [0]}}
+```
+
+Both produce the same result for BTC. Asset names are case-insensitive.
+
+## All metadata endpoints
+
+| Endpoint | What it returns |
+|----------|----------------|
+| `/v2/meta` | All perpetual assets with leverage and sizing |
+| `/v2/spot-meta` | All spot pairs with token details |
+| `/v2/perp-dexes` | Builder DEX list with asset counts |
+| `/v2/perp-categories` | Asset classification |
+| `/v2/perp-dex-status?dex=X` | Single DEX details |
+| `/v2/perp-dex-limits?dex=X` | DEX trading limits |
+| `/v2/all-perp-metas` | Combined metadata across all DEXes |
+| `/v2/perp-annotations` | Asset annotation data |
+| `/v2/prediction/markets` | Prediction market outcomes |
+| `/v2/perp-auction` | Active perp deployment auctions |
+| `/v2/spot-auction` | Active spot pair launch auctions |

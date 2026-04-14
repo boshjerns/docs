@@ -1,0 +1,313 @@
+---
+title: Common Patterns
+description: Ready-to-use code for whale alerts, fill tracking, market signals, and more
+---
+
+Copy-paste patterns for the most common use cases. All examples use TypeScript with the `ws` package.
+
+## Whale alert bot
+
+Detect large orders and send alerts.
+
+```typescript
+import WebSocket from "ws";
+
+const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=pn_live_YOUR_KEY");
+const THRESHOLD_USD = 100_000;
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({
+    action: "subscribe",
+    filters: { action_types: ["order"] }
+  }));
+});
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  if (event.type !== "order" || event.consensus !== "confirmed") return;
+
+  const d = event.data;
+  const notional = parseFloat(d.sz) * parseFloat(d.px);
+
+  if (notional >= THRESHOLD_USD) {
+    const side = d.side === "B" ? "BUY" : "SELL";
+    console.log(`WHALE ${side} ${event.asset}: ${d.sz} @ ${d.px} ($${Math.round(notional).toLocaleString()})`);
+    console.log(`  Wallet: ${event.user}`);
+    console.log(`  Order ID: ${d.oid}`);
+    // Send to Telegram, Discord, etc.
+  }
+});
+```
+
+## Fill tracker with PnL
+
+Track every fill on a wallet and compute running PnL.
+
+```typescript
+import WebSocket from "ws";
+
+const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=pn_live_YOUR_KEY");
+const WALLET = "0xd071d6d6ea52f5aa34b79e47f908ee48c8215837";
+let totalPnl = 0;
+let totalFees = 0;
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({
+    action: "subscribe",
+    filters: { addresses: [WALLET], action_types: ["fill"] }
+  }));
+});
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  if (event.type !== "fill") return;
+
+  const d = event.data;
+  const pnl = parseFloat(d.closedPnl || "0");
+  const fee = parseFloat(d.fee || "0");
+
+  totalPnl += pnl;
+  totalFees += fee;
+
+  console.log(`${event.asset} ${d.dir} ${d.sz}@${d.px}`);
+  console.log(`  PnL: ${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} | Fee: ${fee.toFixed(4)} ${d.feeToken}`);
+  console.log(`  Running: PnL=${totalPnl.toFixed(2)} Fees=${totalFees.toFixed(4)}`);
+});
+```
+
+## Cancel storm detector
+
+Detect when market makers are aggressively pulling orders. A burst of cancels often precedes a price move.
+
+```typescript
+import WebSocket from "ws";
+
+const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=pn_live_YOUR_KEY");
+const WINDOW_MS = 2000;
+const THRESHOLD = 20;
+
+const cancelWindows: Map<string, number[]> = new Map();
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({
+    action: "subscribe",
+    filters: { action_types: ["cancel", "cancelByCloid"], assets: ["BTC", "ETH", "SOL"] }
+  }));
+});
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  if (event.consensus !== "pre") return;
+
+  const asset = event.asset;
+  const now = Date.now();
+
+  if (!cancelWindows.has(asset)) cancelWindows.set(asset, []);
+  const timestamps = cancelWindows.get(asset)!;
+  timestamps.push(now);
+
+  // Trim old timestamps
+  while (timestamps.length > 0 && timestamps[0] < now - WINDOW_MS) {
+    timestamps.shift();
+  }
+
+  if (timestamps.length >= THRESHOLD) {
+    console.log(`CANCEL STORM: ${asset} — ${timestamps.length} cancels in ${WINDOW_MS}ms`);
+    timestamps.length = 0; // Reset to avoid repeated alerts
+  }
+});
+```
+
+## Copy trader
+
+Replicate trades from a target wallet. Logs the signal; add your execution logic.
+
+```typescript
+import WebSocket from "ws";
+
+const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=pn_live_YOUR_KEY");
+const TARGETS = [
+  "0xd071d6d6ea52f5aa34b79e47f908ee48c8215837",
+  "0x1234567890abcdef1234567890abcdef12345678",
+];
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({
+    action: "subscribe",
+    filters: { addresses: TARGETS, action_types: ["fill"] }
+  }));
+});
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  if (event.type !== "fill") return;
+
+  const d = event.data;
+  console.log(`COPY SIGNAL from ${event.user.slice(0, 8)}...`);
+  console.log(`  ${event.asset} ${d.dir} ${d.sz} @ ${d.px}`);
+
+  // Execute your copy trade:
+  // POST to https://hyper.polynode.dev/exchange/order with your signed payload
+});
+```
+
+## Multi-asset dashboard
+
+Stream orders and fills for multiple assets simultaneously.
+
+```typescript
+import WebSocket from "ws";
+
+const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=pn_live_YOUR_KEY");
+const ASSETS = ["BTC", "ETH", "SOL", "HYPE", "DOGE"];
+
+const stats: Record<string, { orders: number; fills: number; volume: number }> = {};
+for (const a of ASSETS) stats[a] = { orders: 0, fills: 0, volume: 0 };
+
+ws.on("open", () => {
+  for (const asset of ASSETS) {
+    ws.send(JSON.stringify({
+      action: "subscribe",
+      filters: { assets: [asset], action_types: ["order", "fill"] }
+    }));
+  }
+});
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  if (!stats[event.asset]) return;
+
+  if (event.type === "order") stats[event.asset].orders++;
+  if (event.type === "fill") {
+    stats[event.asset].fills++;
+    stats[event.asset].volume += parseFloat(event.data.sz) * parseFloat(event.data.px);
+  }
+});
+
+// Print stats every 10 seconds
+setInterval(() => {
+  console.clear();
+  console.log("Asset     Orders   Fills    Volume");
+  console.log("-------   ------   -----    ------");
+  for (const [asset, s] of Object.entries(stats)) {
+    console.log(`${asset.padEnd(10)}${String(s.orders).padEnd(9)}${String(s.fills).padEnd(9)}$${Math.round(s.volume).toLocaleString()}`);
+  }
+}, 10000);
+```
+
+## L4 order book poller
+
+Poll the L4 order book (individual orders with wallet addresses) via REST.
+
+```typescript
+const API_KEY = "pn_live_YOUR_KEY";
+const BASE = "https://hyper.polynode.dev";
+
+async function getL4Book(coin: string) {
+  const res = await fetch(`${BASE}/v2/l4book?coin=${coin}`, {
+    headers: { "x-api-key": API_KEY }
+  });
+  const book = await res.json();
+
+  const bids = book.levels.filter((l: any) => l.side === "B").sort((a: any, b: any) => parseFloat(b.px) - parseFloat(a.px));
+  const asks = book.levels.filter((l: any) => l.side === "A").sort((a: any, b: any) => parseFloat(a.px) - parseFloat(b.px));
+
+  console.log(`${coin} L4 Book — ${bids.length} bids | ${asks.length} asks`);
+  console.log("\nTop 10 Bids:");
+  for (const b of bids.slice(0, 10)) {
+    console.log(`  ${b.px}  ${b.sz}  ${b.user.slice(0, 8)}...`);
+  }
+  console.log("\nTop 10 Asks:");
+  for (const a of asks.slice(0, 10)) {
+    console.log(`  ${a.px}  ${a.sz}  ${a.user.slice(0, 8)}...`);
+  }
+}
+
+// Poll every 5 seconds
+setInterval(() => getL4Book("BTC"), 5000);
+getL4Book("BTC");
+```
+
+## Rejection monitor
+
+Track order rejections across all assets. Useful for identifying accounts under margin stress.
+
+```typescript
+import WebSocket from "ws";
+
+const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=pn_live_YOUR_KEY");
+const rejectionCounts: Map<string, { count: number; reasons: string[] }> = new Map();
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({
+    action: "subscribe",
+    filters: { action_types: ["order"] }
+  }));
+});
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  if (event.type !== "order_rejected") return;
+
+  const wallet = event.user;
+  const reason = event.data.status;
+
+  if (!rejectionCounts.has(wallet)) {
+    rejectionCounts.set(wallet, { count: 0, reasons: [] });
+  }
+  const entry = rejectionCounts.get(wallet)!;
+  entry.count++;
+  entry.reasons.push(reason);
+
+  if (entry.count >= 5) {
+    console.log(`HIGH REJECTION RATE: ${wallet}`);
+    console.log(`  ${entry.count} rejections: ${[...new Set(entry.reasons)].join(", ")}`);
+    rejectionCounts.delete(wallet); // Reset
+  }
+});
+```
+
+## REST + stream combination
+
+Use REST for initial state, stream for updates.
+
+```typescript
+import WebSocket from "ws";
+
+const API_KEY = "pn_live_YOUR_KEY";
+const WALLET = "0xd071d6d6ea52f5aa34b79e47f908ee48c8215837";
+
+// 1. Get current positions via REST
+async function getPositions() {
+  const res = await fetch(`https://hyper.polynode.dev/v2/user/state?address=${WALLET}`, {
+    headers: { "x-api-key": API_KEY }
+  });
+  return await res.json();
+}
+
+// 2. Stream fills for real-time updates
+function streamFills() {
+  const ws = new WebSocket(`wss://hyper.polynode.dev/ws?key=${API_KEY}`);
+
+  ws.on("open", () => {
+    ws.send(JSON.stringify({
+      action: "subscribe",
+      filters: { addresses: [WALLET], action_types: ["fill"] }
+    }));
+  });
+
+  ws.on("message", (raw) => {
+    const event = JSON.parse(raw.toString());
+    if (event.type === "fill") {
+      console.log(`Position update: ${event.asset} ${event.data.dir} ${event.data.sz}@${event.data.px}`);
+      // Update local state
+    }
+  });
+}
+
+// Start both
+getPositions().then((positions) => {
+  console.log("Initial positions:", positions);
+  streamFills();
+});
+```

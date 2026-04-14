@@ -1,0 +1,185 @@
+---
+title: Pre-consensus vs Confirmed
+description: Understanding the two data layers in the hypernode stream and when to use each
+---
+
+hypernode is the only HyperLiquid API that merges two consensus layers into one WebSocket stream. Every event arrives tagged `consensus: "pre"` or `consensus: "confirmed"` so you always know what you're looking at.
+
+## The two layers
+
+| | Pre-consensus | Confirmed |
+|---|---|---|
+| **Source** | Gossip protocol (before validators process) | Non-validator node (after block commit) |
+| **Timing** | ~1-2 seconds ahead of public API | ~0.5 seconds behind live |
+| **What you see** | Cancels, modifications, TWAP orders | All orders, fills, cancellations, rejections |
+| **Completeness** | Partial (no order placements, no fills) | 100% of all trading activity |
+| **Tag** | `consensus: "pre"` | `consensus: "confirmed"` |
+
+## What each layer contains
+
+### Pre-consensus events
+
+These are raw actions submitted by traders, intercepted from the gossip protocol before validators commit them. You see what traders are *trying to do* before it happens.
+
+| Type | What it means |
+|------|---------------|
+| `cancel` | Trader is pulling an order off the book |
+| `cancelByCloid` | Cancel by client order ID |
+| `batchModify` | Trader is adjusting price or size on multiple orders |
+| `scheduleCancel` | Timed cancellation (cancel-after) |
+| `twapOrder` | TWAP order submission |
+
+### Confirmed events
+
+These are the results after the validator processes the action. Every order placed on HyperLiquid produces exactly one confirmed event.
+
+| Type | What it means |
+|------|---------------|
+| `order` | New resting limit order (status: open) |
+| `order_filled` | Order filled immediately on placement |
+| `order_canceled` | Order was canceled successfully |
+| `order_rejected` | Order rejected (margin, price, balance) |
+| `fill` | Trade execution with PnL, fees, direction |
+| `triggered` | Stop/trigger order activated (rare) |
+
+## Use cases by layer
+
+### Market making: pre-consensus cancels = the book is about to change
+
+A burst of pre-consensus `cancel` events on one side means a market maker is pulling quotes. The order book is about to thin out on that side. You see this 1-2 seconds before the cancels appear in the confirmed stream.
+
+```typescript
+let cancelCount = 0;
+let windowStart = Date.now();
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+
+  if (event.consensus === "pre" && event.type === "cancel" && event.asset === "BTC") {
+    cancelCount++;
+    if (cancelCount > 10 && Date.now() - windowStart < 1000) {
+      console.log("Cancel storm on BTC — book about to thin");
+      cancelCount = 0;
+      windowStart = Date.now();
+    }
+  }
+});
+```
+
+**Subscribe:**
+```json
+{
+  "action": "subscribe",
+  "filters": {"action_types": ["cancel", "cancelByCloid", "batchModify"], "assets": ["BTC"]}
+}
+```
+
+### Execution tracking: confirmed fills are your source of truth
+
+Every trade that executes on HyperLiquid produces a confirmed `fill` event with price, size, direction, PnL, and fees. Use these for accounting, tracking, and analytics.
+
+```typescript
+if (event.consensus === "confirmed" && event.type === "fill") {
+  const d = event.data;
+  console.log(`FILL: ${event.asset} ${d.side === "B" ? "BUY" : "SELL"} ${d.sz}@${d.px}`);
+  console.log(`  Direction: ${d.dir} | PnL: ${d.closedPnl} | Fee: ${d.fee} ${d.feeToken}`);
+}
+```
+
+**Subscribe:** `{"action": "subscribe", "filters": {"action_types": ["fill"]}}`
+
+### Whale tracking: confirmed orders show exact sizes
+
+New resting limit orders appear as confirmed `order` events with the full wallet address, price, and size. Filter by minimum notional to catch whale orders.
+
+```typescript
+if (event.type === "order" && event.consensus === "confirmed") {
+  const notional = parseFloat(event.data.sz) * parseFloat(event.data.px);
+  if (notional > 100000) {
+    console.log(`WHALE: ${event.asset} ${event.data.side === "B" ? "BUY" : "SELL"}`);
+    console.log(`  ${event.data.sz} @ ${event.data.px} ($${notional.toLocaleString()})`);
+    console.log(`  Wallet: ${event.user}`);
+  }
+}
+```
+
+**Subscribe:** `{"action": "subscribe", "filters": {"action_types": ["order"]}}`
+
+### Liquidation detection: rejected orders signal margin stress
+
+When a trader's order is rejected with `perpMarginRejected` or `reduceOnlyRejected`, they're running out of margin. A cluster of rejections on one wallet is a liquidation warning.
+
+```typescript
+if (event.type === "order_rejected" && event.consensus === "confirmed") {
+  const status = event.data.status;
+  if (status === "perpMarginRejected" || status === "reduceOnlyRejected") {
+    console.log(`MARGIN STRESS: ${event.user} rejected on ${event.asset} — ${status}`);
+  }
+}
+```
+
+**Subscribe:** `{"action": "subscribe", "filters": {"action_types": ["order"]}}`
+
+<Note>
+`order_rejected` matches when you subscribe to the umbrella type `"order"`. To get only rejections, subscribe to `"order"` and filter client-side for `event.type === "order_rejected"`.
+</Note>
+
+### Copy trading: follow a wallet's confirmed fills
+
+Subscribe to a wallet address. When you see their confirmed fills, replicate the trade.
+
+```typescript
+const TARGET = "0xd071d6d6ea52f5aa34b79e47f908ee48c8215837";
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  if (event.type === "fill" && event.user.toLowerCase() === TARGET.toLowerCase()) {
+    console.log(`TARGET TRADED: ${event.asset} ${event.data.dir} ${event.data.sz}@${event.data.px}`);
+    // Execute your copy trade here
+  }
+});
+```
+
+**Subscribe:**
+```json
+{
+  "action": "subscribe",
+  "filters": {"addresses": ["0xd071d6d6ea52f5aa34b79e47f908ee48c8215837"], "action_types": ["fill"]}
+}
+```
+
+## Combining both layers
+
+The real power is using both layers together. Pre-consensus gives you early warning. Confirmed gives you ground truth.
+
+```typescript
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+
+  if (event.consensus === "pre") {
+    // Early signal — something is about to happen
+    handlePreConsensus(event);
+  }
+
+  if (event.consensus === "confirmed") {
+    // Ground truth — this actually happened
+    handleConfirmed(event);
+  }
+});
+```
+
+| Strategy | Pre-consensus signal | Confirmed action |
+|----------|---------------------|-----------------|
+| Market making | Cancel storm = widen spread | Fill = update inventory |
+| Whale tracking | — | Large order = alert |
+| Copy trading | — | Target fill = replicate |
+| Liquidation sniping | — | Rejection cluster = prepare |
+| MEV research | Cancel + modify patterns | Fill = measure impact |
+
+## Event volume
+
+At ~6,500 events per second total:
+- Pre-consensus: ~1,300/sec (mostly cancels and modifies)
+- Confirmed: ~5,200/sec (orders, fills, rejections)
+
+Use [filters](/api/filters) to narrow the stream. Subscribing to one asset or one wallet drops the volume to a manageable level.
