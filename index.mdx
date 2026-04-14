@@ -19,14 +19,31 @@ Every order, fill, and cancellation on HyperLiquid, streamed in real-time throug
   </Card>
 </CardGroup>
 
+## One key, both chains
+
+hypernode is the only HyperLiquid API that bundles data, trading, and infrastructure in one place.
+
+| Capability | hypernode | Alternatives |
+|------------|:---------:|:-------------|
+| Pre-consensus gossip (cancels/modifies ~1s early) | Included | Not available anywhere |
+| Confirmed order flow (every order, fill, rejection) | Included | Hydromancer ($300+/mo) |
+| L4 order book (individual orders with wallet addresses) | Included | Hydromancer ($300+/mo) |
+| Trading execution (place, cancel, modify orders) | Included | Build it yourself |
+| EVM RPC (contract reads, tx submission, chain 999) | Included | HypeRPC ($2,000/mo) |
+| 54 REST endpoints (market data, user state, DeFi) | Included | Partial coverage elsewhere |
+
+Starts at $50/mo. One `pn_live_` key works across everything.
+
 ## The unified stream
 
 hypernode merges two data sources that nobody else combines:
 
-- **Pre-consensus** — cancel and modify actions from the gossip protocol, before validators commit them
-- **Confirmed** — every order placement, fill, cancellation, and rejection from the non-validator node, after block commit
+- **Pre-consensus** — cancel and modify actions from the gossip protocol, before validators commit them. ~1 second ahead of the public API.
+- **Confirmed** — every order placement, fill, cancellation, and rejection from the non-validator node, after block commit.
 
 Every event is tagged `consensus: "pre"` or `consensus: "confirmed"` so you always know what you're looking at.
+
+~6,500 events per second on mainnet. Filter down to exactly what you need.
 
 ## Quick start
 
@@ -36,7 +53,6 @@ import WebSocket from "ws";
 const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=YOUR_KEY");
 
 ws.on("open", () => {
-  // Subscribe to all orders and fills
   ws.send(JSON.stringify({
     action: "subscribe",
     filters: { action_types: ["order", "fill"] }
@@ -66,16 +82,19 @@ ws.on("message", (raw) => {
 
 Subscribe to `"order"` to get all order lifecycle events. See [Event Format](/api/events) for the complete reference.
 
-## Exchange API
+## REST API
 
-51 REST endpoints for trading, market data, and account management on HyperLiquid. No SDK required.
+54 endpoints for trading, market data, user state, and DeFi on HyperLiquid.
 
 ```bash
-# Mid prices for every asset
-curl https://hyper.polynode.dev/exchange/prices
+# L4 order book — every individual order with wallet address
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/l4book?coin=BTC"
 
-# BTC orderbook
-curl "https://hyper.polynode.dev/exchange/orderbook?coin=BTC"
+# User positions and margin
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/user/state?address=0x..."
+
+# Cross-venue funding rate comparison
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/funding-rates"
 ```
 
 ## Authentication
@@ -88,7 +107,7 @@ hypernode uses the same API keys as [polynode](https://polynode.dev). If you hav
   <Card title="Stream Quickstart" icon="bolt" href="/quickstart">
     Connect and subscribe in 30 seconds
   </Card>
-  <Card title="Exchange API" icon="code" href="/rest/overview">
-    REST endpoints for trading and market data
+  <Card title="REST API" icon="code" href="/rest/overview">
+    54 endpoints for market data, trading, and DeFi
   </Card>
 </CardGroup>
