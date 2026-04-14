@@ -85,7 +85,9 @@ Returns every individual resting order for the specified asset, including the wa
 | `isTrigger` | boolean | Whether this is a trigger/stop order |
 | `triggerPx` | string | Trigger price (if applicable) |
 | `isPositionTpsl` | boolean | Whether this is a position TP/SL |
-| `cloid` | string | Client order ID (if set) |
+| `cloid` | string or null | Client order ID. Null if not set (~60% of orders). |
+| `children` | array | Child TP/SL orders attached to this order. Each child is a full order object with trigger conditions. |
+| `triggerCondition` | string | Trigger condition: `"N/A"` for regular orders, or a condition like `"Price above 74563"` for trigger orders. |
 
 ## Example
 
@@ -109,9 +111,15 @@ const biggestBid = book.bids.reduce((max, o) =>
 console.log(`Largest bid: ${biggestBid.sz} @ ${biggestBid.limitPx} by ${biggestBid.user}`);
 ```
 
+## Nullable fields
+
+Some fields can be `null`:
+- `cloid` — null when no client order ID was set (~60% of orders)
+- `tif` — rarely null, usually `"Alo"` or `"Gtc"`
+- `builder` — null when no builder fee is attached
+
 ## Notes
 
-- Response size for BTC is ~15MB (33,000+ orders). Use compression (`Accept-Encoding: gzip`).
+- Response size for BTC is ~18MB (~48,000 total orders). Use compression (`Accept-Encoding: gzip`).
 - Data refreshes every 1 second from our local node.
 - Trigger orders that have not been activated are **not included**.
-- Spot order books are **not included** in the current version.
