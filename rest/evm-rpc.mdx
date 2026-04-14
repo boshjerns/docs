@@ -1,10 +1,10 @@
 ---
 title: EVM RPC
 sidebarTitle: EVM RPC
-description: Standard Ethereum JSON-RPC for HyperEVM (chain 999)
+description: Dedicated Ethereum JSON-RPC for HyperEVM (chain 999), powered by our own non-validator node
 ---
 
-hypernode includes an EVM RPC endpoint for HyperEVM, the EVM-compatible chain running alongside HyperCore. This is a convenience feature bundled with your API key, not a dedicated RPC product.
+hypernode runs its own HyperLiquid non-validator node. The EVM RPC gives you direct access to it for HyperEVM queries and transaction submission. No shared public endpoint, no rate limit contention with other users.
 
 <Note>
 This endpoint serves **HyperEVM** (chain ID 999), not HyperCore. HyperCore orders, fills, and the L1 matching engine are served by the [WebSocket stream](/api/connection) and [REST API](/rest/overview). The EVM RPC is for smart contract reads, token balances, and HyperEVM transaction submission.
@@ -33,7 +33,7 @@ curl -X POST https://hyper.polynode.dev/v2/evm \
 | `eth_chainId` | Chain ID (999) |
 | `eth_gasPrice` | Current gas price |
 | `eth_getBalance` | Address balance at latest block |
-| `eth_getBlockByNumber` | Block by number (recent blocks only) |
+| `eth_getBlockByNumber` | Block by number (recent blocks) |
 | `eth_getBlockByHash` | Block by hash |
 | `eth_getTransactionByHash` | Transaction details |
 | `eth_getTransactionReceipt` | Transaction receipt with logs |
@@ -49,9 +49,15 @@ curl -X POST https://hyper.polynode.dev/v2/evm \
 | `net_version` | Network version |
 | `web3_clientVersion` | Client version |
 
+## What this is
+
+This is a dedicated RPC powered by our own non-validator node running on bare metal. Your requests go directly to our node, not to a shared public endpoint. The same node that powers the unified WebSocket stream and L4 order book also serves this RPC.
+
+Combined with the HyperCore trading API, one hypernode key gives you both chains: place orders on HyperCore via `POST /v2/order`, read contracts and submit transactions on HyperEVM via `POST /v2/evm`.
+
 ## Limitations
 
-**Recent blocks only.** Block and state queries work for the last ~300 blocks. Older blocks return an error. This is a non-archival node. If you need deep historical state, use an archival RPC provider.
+**Recent blocks only.** Block and state queries work for the last ~300 blocks. Older blocks return an error. For deep historical state queries, use an archival provider.
 
 **No WebSocket subscriptions.** `eth_subscribe`, `eth_newFilter`, and `eth_newBlockFilter` are not supported. Poll `eth_blockNumber` or `eth_getLogs` instead.
 
