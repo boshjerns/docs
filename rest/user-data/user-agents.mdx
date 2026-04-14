@@ -1,0 +1,41 @@
+---
+title: API Agents
+sidebarTitle: Agents
+description: Sub-wallets with delegated signing permissions
+---
+
+## Endpoint
+
+```
+GET /v2/user/agents?address={wallet}
+```
+
+Returns API agent wallets (sub-keys) that can sign actions on behalf of the master account without holding funds.
+
+## Response
+
+```json
+[
+  {
+    "address": "0xabcd...",
+    "name": "trading-bot-1",
+    "validUntil": 1776200000
+  }
+]
+```
+
+Empty array `[]` if the wallet has no registered agents.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `address` | string | Agent wallet address |
+| `name` | string | Agent name (unnamed agents can be replaced on re-registration) |
+| `validUntil` | number | Expiry timestamp. Agent is pruned after this time |
+
+Agents are registered via the `approveAgent` action. Each agent has its own nonce sequence. Agent wallets get pruned when deregistered or when the master account loses all funds.
+
+## Example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/user/agents?address=0x..."
+```

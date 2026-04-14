@@ -1,0 +1,49 @@
+---
+title: DEX Limits
+sidebarTitle: DEX Limits
+description: OI caps and transfer limits for builder-deployed DEXes
+---
+
+## Endpoint
+
+```
+GET /v2/perp-dex-limits?dex={name}
+```
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| `dex` | Yes | DEX short name (e.g., `xyz`, `flx`) |
+
+Returns `null` for the native HyperLiquid DEX (no builder-level limits).
+
+## Response
+
+```json
+{
+  "totalOiCap": "6000000000.0",
+  "oiSzCapPerPerp": "20000000000.0",
+  "maxTransferNtl": "1600000000.0",
+  "coinToOiCap": [
+    ["xyz:AAPL", "50000000.0"],
+    ["xyz:AMD", "50000000.0"],
+    ["xyz:GOLD", "100000000.0"]
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `totalOiCap` | string | Maximum total open interest across all assets on this DEX (USD) |
+| `oiSzCapPerPerp` | string | Default per-asset OI cap (USD) |
+| `maxTransferNtl` | string | Maximum single transfer notional (USD) |
+| `coinToOiCap` | array | Per-asset OI cap overrides as `[coin, cap]` pairs |
+
+## Examples
+
+```bash
+# XYZ DEX limits ($6B total OI cap)
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/perp-dex-limits?dex=xyz"
+
+# Felix DEX limits ($200M total OI cap)
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/perp-dex-limits?dex=flx"
+```

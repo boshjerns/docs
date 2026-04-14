@@ -1,0 +1,59 @@
+---
+title: Deployment Auctions
+sidebarTitle: Deployment Auctions
+description: Live Dutch auctions for deploying new perp markets and spot pairs
+---
+
+Anyone can deploy a new perpetual market or spot pair on HyperLiquid by winning a Dutch auction. The price decreases over time until someone bids.
+
+## Endpoints
+
+### Perp deployment auction
+
+```
+GET /v2/perp-auction
+```
+
+```json
+{
+  "startTimeSeconds": 1776114000,
+  "durationSeconds": 111600,
+  "startGas": "1000.0",
+  "currentGas": "756.90",
+  "endGas": null
+}
+```
+
+### Spot pair deployment auction
+
+```
+GET /v2/spot-auction
+```
+
+Same response format as above.
+
+## Response fields
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `startTimeSeconds` | number | Unix timestamp when the auction started |
+| `durationSeconds` | number | Total auction duration in seconds |
+| `startGas` | string | Starting price in USDC |
+| `currentGas` | string | Current price, decreasing over time |
+| `endGas` | string\|null | Final price when auction ended. `null` if still running |
+
+## How it works
+
+HIP-3 builder DEXes get 3 free asset deployments. Additional assets require winning the shared Dutch auction. The starting price is 2x the previous successful auction price (floor: 500 HYPE for perps). Price decreases linearly over the duration.
+
+Builders also receive 7 reserve deployments that bypass the auction at the current price.
+
+## Examples
+
+```bash
+# Current perp deployment auction price
+curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/perp-auction
+
+# Current spot pair deployment auction price
+curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/spot-auction
+```

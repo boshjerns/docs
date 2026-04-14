@@ -1,12 +1,10 @@
 ---
 title: Priority Auction
 sidebarTitle: Priority Auction
-description: Gossip priority transaction auction status — MEV data
+description: MEV priority gas auction status for gossip data stream slots
 ---
 
-<Note>
-This data shows who is bidding for priority transaction inclusion on HyperLiquid. Useful for MEV research and understanding block construction.
-</Note>
+HyperLiquid runs a priority fee system where builders bid for faster data delivery. Five independent Dutch auction slots cycle every 3 minutes. Winning a slot gives your IP address priority ordering in the gossip data stream, reducing latency by roughly 10ms per slot. Slot 0 is best.
 
 ## Endpoint
 
@@ -14,25 +12,55 @@ This data shows who is bidding for priority transaction inclusion on HyperLiquid
 GET /v2/gossip-priority-auction
 ```
 
-Returns the current state of the gossip priority auction. Refreshed every 5 seconds.
+## Response
 
 ```json
 [
   [null, null, null, null, null],
-  [{
-    "startTimeSeconds": 1776156480,
-    "durationSeconds": 180,
-    "startGas": "0.1",
-    "endGas": "10.0"
-  }]
+  [
+    {
+      "startTimeSeconds": 1776168540,
+      "durationSeconds": 180,
+      "startGas": "0.1",
+      "currentGas": "0.1",
+      "endGas": null
+    }
+  ]
 ]
 ```
 
-## What is the priority auction?
+The response is a 2-element array:
 
-HyperLiquid allows users to bid for priority transaction ordering via `gossipPriorityBid` actions. This endpoint shows the current auction parameters: when it started, how long it runs, and the gas price range.
+**Element 0: Previous winners** — array of 5 slots. `null` if nobody won that slot in the last cycle. When a slot is won, contains the winning bid details.
 
-This is relevant for:
-- **MEV research** — who is paying for priority inclusion
-- **Trading strategies** — understanding when priority bidding is active
-- **Block analysis** — correlating priority bids with block construction
+**Element 1: Current auctions** — array of 5 active Dutch auctions, one per slot.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `startTimeSeconds` | number | Unix timestamp when this 3-minute auction began |
+| `durationSeconds` | number | Always 180 (3 minutes) |
+| `startGas` | string | Starting price in HYPE (10x previous winner, floor 0.1) |
+| `currentGas` | string | Current price, decreasing linearly over the 180 seconds |
+| `endGas` | string\|null | Final price at auction end. `null` if auction is still running |
+
+## How bidding works
+
+Builders submit a `gossipPriorityBid` action specifying the slot index (0-4), their IP address, and a max gas amount in HYPE. The bid succeeds if the max gas meets or exceeds the current auction price. Gas is charged from spot HYPE balance and burned.
+
+Lower slot index = higher priority. All 5 slots reset simultaneously every 3 minutes.
+
+## Use cases
+
+- **MEV monitoring:** Track which slots are being bid on and at what price. Rising gas prices signal competitive activity.
+- **Cost analysis:** Calculate the cost of priority access over time.
+- **Market regime detection:** During volatile markets, priority slots get expensive. During quiet periods, all slots sit at the 0.1 HYPE floor.
+
+## Example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/gossip-priority-auction
+```
+
+<Note>
+There is also a separate **order priority** system for faster IOC order execution on HIP-3 assets. Order priority fees appear as a `priorityGas` field on fill events in the stream. That system is independent of these gossip data slots.
+</Note>

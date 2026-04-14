@@ -1,0 +1,32 @@
+---
+title: Account Mode
+sidebarTitle: Account Mode
+description: Account abstraction mode — standard, unified, or portfolio margin
+---
+
+## Endpoint
+
+```
+GET /v2/user/abstraction?address={wallet}
+```
+
+## Response
+
+```json
+"disabled"
+```
+
+Returns a string indicating the account's balance organization mode:
+
+| Value | Description |
+|-------|-------------|
+| `"disabled"` | Standard mode. Separate perp and spot balances, separate DEX balances. No daily action limits. Required for builder code addresses. |
+| `"default"` | Default frontend mode. |
+| `"unifiedAccount"` | Unified account. Single balance across all cross-margin perps and spot. 50K daily action limit. |
+| `"portfolioMargin"` | Portfolio margin. Single portfolio across eligible assets (HYPE, BTC, USDH, USDC). Most capital-efficient. Currently pre-alpha. 50K daily action limit. |
+
+## Example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/user/abstraction?address=0x..."
+```

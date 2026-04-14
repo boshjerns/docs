@@ -1,0 +1,37 @@
+---
+title: Staking Delegations
+sidebarTitle: Delegations
+description: User's HYPE staking delegations to validators
+---
+
+## Endpoint
+
+```
+GET /v2/user/delegations?address={wallet}
+```
+
+## Response
+
+```json
+[
+  {
+    "validator": "0x1234...",
+    "amount": "5000.0",
+    "lockedUntil": null
+  }
+]
+```
+
+Empty array `[]` if the wallet has no active delegations.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `validator` | string | Validator address receiving the delegation |
+| `amount` | string | Amount of HYPE delegated |
+| `lockedUntil` | number\|null | Lock expiry timestamp, `null` if unlocked |
+
+## Example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/user/delegations?address=0x..."
+```

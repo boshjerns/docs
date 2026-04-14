@@ -1,0 +1,39 @@
+---
+title: Max Market Orders
+sidebarTitle: Max Market Orders
+description: Maximum market order size by leverage tier
+---
+
+## Endpoint
+
+```
+GET /v2/max-market-orders
+```
+
+## Response
+
+```json
+[
+  [40, "30000000.0"],
+  [25, "30000000.0"],
+  [20, "5000000.0"],
+  [10, "2000000.0"],
+  [1, "500000.0"]
+]
+```
+
+Array of `[max_leverage, max_notional_usd]` pairs. At higher leverage, larger market orders are allowed. This prevents outsized market orders from sweeping thin books at low leverage.
+
+| Leverage | Max Market Order |
+|----------|-----------------|
+| 40x | $30,000,000 |
+| 25x | $30,000,000 |
+| 20x | $5,000,000 |
+| 10x | $2,000,000 |
+| 1x | $500,000 |
+
+## Example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/max-market-orders
+```

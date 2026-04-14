@@ -1,0 +1,25 @@
+---
+title: Multi-Sig Signers
+sidebarTitle: Multi-Sig
+description: Authorized signers for multi-sig controlled accounts
+---
+
+## Endpoint
+
+```
+GET /v2/user/multi-sig?address={wallet}
+```
+
+## Response
+
+```json
+null
+```
+
+Returns `null` if the wallet is not a multi-sig account. For multi-sig wallets, returns the list of authorized signers and threshold.
+
+## Example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/user/multi-sig?address=0x..."
+```

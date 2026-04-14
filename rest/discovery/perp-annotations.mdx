@@ -1,0 +1,38 @@
+---
+title: Asset Annotations
+sidebarTitle: Annotations
+description: Asset categorization — crypto, stocks, commodities
+---
+
+## Endpoint
+
+```
+GET /v2/perp-annotations
+```
+
+## Response
+
+```json
+[
+  ["flx:BTC", {"category": "crypto"}],
+  ["flx:NVDA", {"category": "stocks"}],
+  ["flx:GOLD", {"category": "commodities"}],
+  ["flx:OIL", {"category": "commodities"}]
+]
+```
+
+Array of `[coin, annotation]` pairs. Currently used by HIP-3 builder DEXes to classify their assets.
+
+| Category | Examples |
+|----------|---------|
+| `crypto` | flx:BTC |
+| `stocks` | flx:NVDA, flx:COIN, flx:CRCL |
+| `commodities` | flx:GOLD, flx:OIL, flx:COPPER, flx:GAS |
+
+The `flx:` prefix indicates Felix Exchange assets. Use alongside [`/v2/perp-categories`](/rest/discovery/perp-categories) for native HyperLiquid asset classification.
+
+## Example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/perp-annotations
+```

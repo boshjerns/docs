@@ -87,7 +87,11 @@
               "rest/market-data/candles",
               "rest/market-data/funding",
               "rest/market-data/funding-history",
-              "rest/market-data/predicted-fundings"
+              "rest/market-data/predicted-fundings",
+              "rest/market-data/margin-table",
+              "rest/market-data/exchange-status",
+              "rest/market-data/max-market-orders",
+              "rest/market-data/oi-cap"
             ]
           },
           {
@@ -103,7 +107,12 @@
               "rest/user-data/sub-accounts",
               "rest/user-data/portfolio",
               "rest/user-data/user-fees",
-              "rest/user-data/spot-state"
+              "rest/user-data/spot-state",
+              "rest/user-data/user-agents",
+              "rest/user-data/user-delegations",
+              "rest/user-data/user-abstraction",
+              "rest/user-data/user-builder-fee",
+              "rest/user-data/user-multi-sig"
             ]
           },
           {
@@ -121,7 +130,12 @@
               "rest/discovery/perp-categories",
               "rest/discovery/spot-pairs",
               "rest/discovery/perp-auction",
-              "rest/discovery/spot-auction"
+              "rest/discovery/spot-auction",
+              "rest/discovery/perp-dex-status",
+              "rest/discovery/perp-dex-limits",
+              "rest/discovery/deployment-auctions",
+              "rest/discovery/all-perp-metas",
+              "rest/discovery/perp-annotations"
             ]
           },
           {

@@ -1,0 +1,51 @@
+---
+title: DEX Status
+sidebarTitle: DEX Status
+description: Total net deposits for native and builder-deployed DEXes
+---
+
+## Endpoint
+
+```
+GET /v2/perp-dex-status?dex={name}
+```
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| `dex` | No | DEX short name. Omit for native HyperLiquid totals |
+
+## Response
+
+```json
+{"totalNetDeposit": "2985550006.9582519531"}
+```
+
+| Field | Description |
+|-------|-------------|
+| `totalNetDeposit` | Total net USD deposited into this DEX |
+
+## Available DEXes
+
+| Name | Full Name | Assets | Net Deposits |
+|------|-----------|--------|-------------|
+| *(empty)* | HyperLiquid (native) | 229 | ~$2.98B |
+| `xyz` | XYZ | 63 | ~$611M |
+| `cash` | dreamcash | 16 | ~$38.6M |
+| `hyna` | HyENA | 25 | ~$35.5M |
+| `km` | Markets by Kinetiq | 23 | ~$12.6M |
+| `vntl` | Ventuals | 14 | ~$7.8M |
+| `flx` | Felix Exchange | 16 | ~$4.2M |
+| `para` | Paragon | 3 | ~$256K |
+| `abcd` | ABCDEx | 1 | ~$7 |
+
+These are HIP-3 builder-deployed perpetual DEXes. Each builder controls market listings, oracle sources, leverage limits, and fee collection. HyperLiquid handles execution, matching, margining, liquidations, and settlement.
+
+## Examples
+
+```bash
+# Native HL total deposits
+curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/perp-dex-status
+
+# XYZ deposits
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/perp-dex-status?dex=xyz"
+```

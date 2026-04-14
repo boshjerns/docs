@@ -1,0 +1,32 @@
+---
+title: Open Interest Cap
+sidebarTitle: OI Cap
+description: Assets currently at their open interest cap
+---
+
+## Endpoint
+
+```
+GET /v2/oi-cap
+```
+
+## Response
+
+```json
+["CANTO", "FTM", "JELLY", "LOOM", "MAVIA", "RLB"]
+```
+
+Array of coin names that have hit their open interest cap. When an asset is capped:
+
+- No new positions can be opened
+- Resting orders cannot be placed more than 1% from oracle price
+- HLP (protocol liquidity provider) is exempt and can continue quoting
+- Existing positions can still be closed or reduced
+
+This list changes as OI rises and falls. Typically contains illiquid assets with protective limits. HIP-3 builder-deployed markets have per-DEX OI caps set by the deployer (see [DEX Limits](/rest/discovery/perp-dex-limits)).
+
+## Example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/oi-cap
+```

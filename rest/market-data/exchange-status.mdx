@@ -1,0 +1,33 @@
+---
+title: Exchange Status
+sidebarTitle: Exchange Status
+description: HyperLiquid exchange operational status
+---
+
+## Endpoint
+
+```
+GET /v2/exchange-status
+```
+
+## Response
+
+```json
+{
+  "specialStatuses": null,
+  "time": 1776168246012
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `specialStatuses` | object\|null | `null` when exchange is operating normally. Contains status details during maintenance or halts |
+| `time` | number | Exchange server time in Unix milliseconds |
+
+When `specialStatuses` is `null`, the exchange is fully operational. During maintenance windows or emergency halts, this field will contain details about what is restricted.
+
+## Example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/exchange-status
+```

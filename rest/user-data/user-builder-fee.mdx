@@ -1,0 +1,36 @@
+---
+title: Builder Fee Approval
+sidebarTitle: Builder Fee
+description: Check the maximum builder fee a user has approved for a specific builder
+---
+
+## Endpoint
+
+```
+GET /v2/user/max-builder-fee?address={wallet}&builder={builder_address}
+```
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| `address` | Yes | User wallet address |
+| `builder` | Yes | Builder wallet address |
+
+Both parameters are required. Omitting the builder address returns an error.
+
+## Response
+
+```json
+0
+```
+
+Returns an integer representing the approved fee in **tenths of a basis point**. A value of `10` means 1 bps. `0` means no approval has been set for this user/builder pair.
+
+Maximum is 80 (8 bps). Users must approve builder fees via the `ApproveBuilderFee` action, signed by the main wallet (not an agent).
+
+## Example
+
+```bash
+# Check if user approved any fee for the XYZ DEX deployer
+curl -H "x-api-key: YOUR_KEY" \
+  "https://hyper.polynode.dev/v2/user/max-builder-fee?address=0xUSER...&builder=0x88806a71d74ad0a510b350545c9ae490912f0888"
+```

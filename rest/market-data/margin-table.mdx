@@ -1,0 +1,66 @@
+---
+title: Margin Table
+sidebarTitle: Margin Table
+description: Tiered leverage and margin requirements by asset class
+---
+
+Each perpetual asset on HyperLiquid references a margin table that defines its leverage tiers. As position size grows, maximum leverage steps down.
+
+## Endpoint
+
+```
+GET /v2/margin-table?id={table_id}
+```
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| `id` | No | Margin table ID (default: 56, which is BTC's table) |
+
+## How margin table IDs work
+
+- **ID below 50:** Simple single-tier. The ID equals the max leverage. For example, `id=5` means flat 5x leverage with no size-based reduction.
+- **ID 50+:** Tiered tables with position-size-based leverage reduction.
+
+Find an asset's margin table ID in the `meta` response under `marginTableId`.
+
+## Response
+
+```json
+{
+  "description": "tiered 40x",
+  "marginTiers": [
+    {"lowerBound": "0.0", "maxLeverage": 40},
+    {"lowerBound": "150000000.0", "maxLeverage": 20}
+  ]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `description` | string | Human-readable label (empty for simple tables) |
+| `marginTiers` | array | Ordered tiers. Each tier applies from `lowerBound` notional upward |
+| `marginTiers[].lowerBound` | string | Minimum notional position size (USD) for this tier |
+| `marginTiers[].maxLeverage` | number | Maximum leverage allowed at this tier |
+
+Maintenance margin is 50% of the initial margin rate at each tier's max leverage.
+
+## Common tables
+
+| ID | Description | Tiers |
+|----|-------------|-------|
+| 5 | 5x flat | 5x at all sizes |
+| 10 | 10x flat | 10x at all sizes |
+| 20 | 20x flat | 20x at all sizes |
+| 51 | tiered 10x | 10x up to $3M, then 5x |
+| 55 | tiered 25x | 25x up to $100M, then 15x |
+| 56 | tiered 40x | 40x up to $150M, then 20x (BTC, ETH) |
+
+## Example
+
+```bash
+# BTC margin table
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/margin-table?id=56"
+
+# Simple 5x table
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/margin-table?id=5"
+```

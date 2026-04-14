@@ -1,0 +1,45 @@
+---
+title: All Perp Metas
+sidebarTitle: All DEX Metadata
+description: Complete metadata for native and all builder-deployed perpetual DEXes
+---
+
+## Endpoint
+
+```
+GET /v2/all-perp-metas
+```
+
+Returns metadata for all 9 perpetual DEXes in a single call, including the native HyperLiquid DEX and all HIP-3 builder-deployed DEXes.
+
+## Response
+
+Array of 9 objects, each containing a `universe` array of asset metadata:
+
+```json
+[
+  {
+    "universe": [
+      {"szDecimals": 5, "name": "BTC", "maxLeverage": 40, "marginTableId": 56},
+      {"szDecimals": 4, "name": "ETH", "maxLeverage": 25, "marginTableId": 55}
+    ]
+  }
+]
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `universe[].name` | string | Coin name. Prefixed for builder DEXes (`xyz:AAPL`, `flx:GOLD`) |
+| `universe[].szDecimals` | number | Size decimal precision |
+| `universe[].maxLeverage` | number | Maximum leverage for this asset |
+| `universe[].marginTableId` | number | References a [margin table](/rest/market-data/margin-table) |
+
+DEX 0 is native HyperLiquid (229 assets, no prefix). DEXes 1-8 are builder-deployed with prefixed coin names.
+
+## Example
+
+```bash
+curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/all-perp-metas
+```
+
+Use [`/v2/perp-dexes`](/rest/discovery/assets) for full DEX details including deployer addresses, fee recipients, and OI caps.
