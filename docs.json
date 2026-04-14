@@ -181,6 +181,13 @@
         "tab": "Research",
         "groups": [
           {
+            "group": "Signal Research",
+            "badge": "Original",
+            "pages": [
+              "research/cancel-fill-correlation"
+            ]
+          },
+          {
             "group": "Protocol Research",
             "pages": [
               "research/overview",

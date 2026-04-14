@@ -1,0 +1,124 @@
+---
+title: "Cancel-Fill Correlation"
+sidebarTitle: "Cancel-Fill Signal"
+description: "Measuring pre-consensus cancel velocity against confirmed fills to detect market maker stress and order pick-offs"
+---
+
+## Summary
+
+By merging pre-consensus gossip data (cancel actions) with confirmed order flow (fills and cancellations), we can measure how often market makers fail to cancel orders before they get filled. This produces a real-time "market stress" signal that no single data source can provide alone.
+
+## The two data sources
+
+| Source | What it carries | Latency |
+|--------|----------------|---------|
+| Gossip protocol (pre-consensus) | Cancel and modify requests before block commit | ~1.6s ahead of confirmation |
+| Non-validator node (confirmed) | Every order status change: filled, canceled, rejected | Definitive, post-matching |
+
+A cancel in gossip means a user *wants* to pull an order. A confirmed `order_canceled` means it succeeded. A confirmed `order_filled` on the same `oid` means it didn't — the order was taken before the cancel reached the validator.
+
+## Correlation methodology
+
+The `oid` (order ID) is assigned by HyperLiquid's matching engine and is globally unique. It appears in both:
+- Gossip `cancel` events: `data.cancels[].oid`
+- Confirmed `order_canceled` events: `data.oid`
+- Confirmed `order_filled` events: `data.oid`
+
+By tracking oids across both layers, every gossip cancel resolves to one of three outcomes:
+
+| Outcome | What happened | Signal |
+|---------|--------------|--------|
+| `order_canceled` confirmed | Cancel succeeded | Normal market making |
+| `order_filled` confirmed | Order was taken before cancel arrived | **Pick-off: maker lost the race** |
+| No confirmation | Order was already in terminal state | Redundant cancel |
+
+## Measured results
+
+Over a 16-second sample on mainnet (April 14, 2026):
+
+**Cancel confirmation rate:** 49.7% of gossip cancels result in a confirmed cancellation. The remaining 50.3% arrive too late — the order was already filled, previously canceled, or expired.
+
+**Pre-consensus lead time (cancel oid correlation):**
+
+| Metric | Value |
+|--------|-------|
+| Minimum | 0 ms |
+| Median | 1,614 ms |
+| Mean | 1,664 ms |
+| P90 | 3,010 ms |
+| Maximum | 3,579 ms |
+
+The gossip cancel arrives 1.6 seconds before its confirmed outcome on median.
+
+## Cancel velocity as a market signal
+
+Cancel velocity (cancels per second per asset) spikes when market conditions shift. In a 20-second observation window, BTC cancel velocity jumped from 19/sec to 242/sec — a 12x surge involving 264 unique addresses pulling orders simultaneously. This corresponds to a price movement where market makers collectively repriced.
+
+**Sample stress readings (5-second windows):**
+
+| Asset | Cancel/sec | Fill/sec | Unique cancelers | Stress score |
+|-------|-----------|---------|-----------------|-------------|
+| BTC (spike) | 242.6 | 3.0 | 264 | 970 |
+| xyz:CL | 33.2 | 21.0 | 76 | 730 |
+| ETH | 136.6 | 1.2 | 246 | 301 |
+| SOL | 43.2 | 1.6 | 77 | 112 |
+
+High cancel velocity with low fill velocity = market makers pulling quotes (defensive). High cancel velocity with high fill velocity = active repricing under pressure (aggressive).
+
+## Cross-user correlation
+
+When a maker cancels and gets filled, the taker is a different address. By joining cancels and fills on the same asset within a time window:
+
+- 16 BTC addresses were both canceling AND receiving fills in a 16-second window
+- The same heavy market maker address (`0x31ca8395...`) appeared across BTC, BCH, TRX, SKY, and LTC — quoting every asset, constantly canceling
+- Fill events come in matched pairs: one taker buy, one maker sell at the same price and size
+
+## Implementing this signal
+
+Subscribe to cancels and fills on the unified stream:
+
+```typescript
+const ws = new WebSocket("wss://hyper.polynode.dev/ws?key=YOUR_KEY");
+
+ws.send(JSON.stringify({
+  action: "subscribe",
+  filters: { action_types: ["cancel", "cancelByCloid", "order", "fill"] }
+}));
+
+// Track cancel oids per asset
+const cancelOids = new Map(); // asset → Set<oid>
+const cancelVelocity = new Map(); // asset → count in current window
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw);
+
+  if (event.consensus === "pre" && event.type === "cancel") {
+    const asset = event.asset;
+    for (const c of event.data.cancels) {
+      if (!cancelOids.has(asset)) cancelOids.set(asset, new Set());
+      cancelOids.get(asset).add(c.oid);
+      cancelVelocity.set(asset, (cancelVelocity.get(asset) || 0) + 1);
+    }
+  }
+
+  if (event.consensus === "confirmed" && event.type === "order_filled") {
+    const oid = event.data.oid;
+    const asset = event.asset;
+    // Was this order being canceled?
+    if (cancelOids.get(asset)?.has(oid)) {
+      console.log("PICK-OFF:", asset, "oid", oid,
+        "filled at", event.data.px, "x", event.data.sz,
+        "user", event.user);
+    }
+  }
+});
+```
+
+## Why this only works on hypernode
+
+This signal requires both data layers merged in one stream:
+- **Gossip cancels** are not available through any public HyperLiquid API
+- **Confirmed fills with oids** come from the non-validator node
+- The `oid` correlation between layers is only possible when both sources are tagged and delivered together
+
+No other HyperLiquid data provider combines pre-consensus gossip with confirmed order flow.
