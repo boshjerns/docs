@@ -168,21 +168,14 @@ Remove a subscription by sending the same filters with `action: "unsubscribe"`:
 {"action": "unsubscribe", "filters": {"assets": ["BTC"], "action_types": ["fill"]}}
 ```
 
-## Decision tree
+## Quick reference
 
-```
-What do you need?
-|
-+-- Track a wallet?
-|   +-- Just their trades? --> addresses + action_types: ["fill"]
-|   +-- Everything?        --> addresses only
-|
-+-- Track an asset?
-|   +-- Orders + fills?    --> assets + action_types: ["order", "fill"]
-|   +-- Early cancel signal? --> assets + action_types: ["cancel", "batchModify"]
-|
-+-- All liquidation signals? --> action_types: ["order"], filter client-side
-+-- Prediction markets?      --> assets: ["#encoding"]
-+-- Everything?              --> no filters (firehose)
-```
-
+| Goal | Filters |
+|------|---------|
+| Track a wallet (all activity) | `addresses: ["0x..."]` |
+| Track a wallet (trades only) | `addresses: ["0x..."], action_types: ["fill"]` |
+| Track an asset (orders + fills) | `assets: ["BTC"], action_types: ["order", "fill"]` |
+| Early cancel signal | `assets: ["BTC"], action_types: ["cancel", "batchModify"]` |
+| Liquidation signals | `action_types: ["order"]`, filter client-side for rejections |
+| Prediction markets | `assets: ["#39890"]` |
+| Everything (firehose) | no filters |
