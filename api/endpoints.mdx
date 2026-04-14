@@ -55,9 +55,16 @@ Full metrics in JSON format.
   "actions_per_sec": 2344,
   "events_broadcast": 16392548,
   "events_dropped": 8228339,
-  "ws_connections": 0,
-  "ws_subscriptions": 0,
-  "ws_auth_connections": 0
+  "broadcaster_hit_rate_pct": 100.0,
+  "broadcaster_hits": 24620592,
+  "broadcaster_misses": 295,
+  "bytes_received_mb": 5919.85,
+  "frames_total": 81566,
+  "decompress_ok": 81372,
+  "decompress_fail": 194,
+  "ws_connections": 1,
+  "ws_subscriptions": 1,
+  "ws_auth_connections": 1
 }
 ```
 
@@ -67,6 +74,11 @@ Full metrics in JSON format.
 | `actions_per_sec` | Current action throughput |
 | `events_broadcast` | Events delivered to subscribers |
 | `events_dropped` | Events with no matching subscribers |
+| `broadcaster_hit_rate_pct` | Percentage of events matched to at least one subscriber |
+| `broadcaster_hits` / `misses` | Raw match/miss counts |
+| `bytes_received_mb` | Total data received from upstream |
+| `frames_total` | Total protocol frames processed |
+| `decompress_ok` / `fail` | Frame decompression success/failure counts |
 
 ## GET /metrics/prometheus
 
