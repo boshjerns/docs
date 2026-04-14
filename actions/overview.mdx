@@ -26,7 +26,7 @@ Based on live mainnet sampling (~6,500 events per 5 seconds):
 | Event | Layer | Share | Description |
 |-------|-------|-------|-------------|
 | `order_rejected` | confirmed | ~35% | Orders rejected (ALO price, margin, etc.) |
-| `order_open` | confirmed | ~16% | New resting limit orders |
+| `order` | confirmed | ~16% | New resting limit orders (`data.status: "open"`) |
 | `cancelByCloid` | pre | ~11% | Cancel by client order ID |
 | `cancel` | pre | ~6% | Cancel by order ID |
 | `order_canceled` | confirmed | ~5% | Confirmed cancellation |
@@ -43,7 +43,7 @@ These are produced by the HyperLiquid matching engine after processing each acti
 
 | Type | What happened |
 |------|--------------|
-| `order_open` | New limit order is resting on the book |
+| `order` | New limit order resting on book (`data.status: "open"`) |
 | `order_filled` | Order was filled immediately (IOC, market) |
 | `order_canceled` | Order was canceled (confirmed) |
 | `order_rejected` | Order was rejected — check `data.status` for reason |
@@ -91,7 +91,7 @@ These arrive from the gossip protocol before the validator commits them:
 
 <Note>HIP-4 prediction markets are currently on **testnet only**. When they launch on mainnet, all prediction market orders and fills will appear in the stream with a `prediction` metadata object.</Note>
 
-Prediction market events use the same types (`order_open`, `fill`, etc.) but with outcome token coin names (`#39890`) and additional metadata:
+Prediction market events use the same types (`order`, `fill`, etc.) but with outcome token coin names (`#39890`) and additional metadata:
 
 ```json
 {

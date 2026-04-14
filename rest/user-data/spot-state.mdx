@@ -1,6 +1,6 @@
 ---
 title: "Spot Account State"
-openapi: "GET /exchange/user/spot-state"
+openapi: "GET /v2/user/spot"
 ---
 
 Spot clearinghouse state for the user.
@@ -8,5 +8,5 @@ Spot clearinghouse state for the user.
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/exchange/user/spot-state?address=0x..."
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/user/spot?address=0x..."
 ```

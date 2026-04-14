@@ -26,13 +26,17 @@ Some type names match a group of related events:
 
 | Filter value | Matches |
 |-------------|---------|
-| `"order"` | `order_open`, `order_filled`, `order_canceled`, `order_rejected` |
+| `"order"` | `order`, `order_filled`, `order_canceled`, `order_rejected` |
 | `"fill"` | `fill` |
 | `"cancel"` | `cancel` |
 | `"cancelByCloid"` | `cancelByCloid` |
 | `"batchModify"` | `batchModify` |
 
-You can also use exact type names like `"order_open"` to match a single event type.
+Use exact type names like `"order_filled"` or `"order_rejected"` to match a single event type.
+
+<Note>
+There is no `order_open` type. New resting orders use the type `"order"` with `data.status: "open"`. To get only new resting orders, subscribe to `"order"` and filter client-side by `data.status`.
+</Note>
 
 ## Examples
 
@@ -63,7 +67,7 @@ These arrive before the cancel is committed to a block.
 ```json
 {"action": "subscribe"}
 ```
-~6,500 events per 5 seconds on mainnet. Includes both pre-consensus and confirmed events.
+~6,500 events per second on mainnet. Includes both pre-consensus and confirmed events.
 
 **Prediction market activity:**
 ```json

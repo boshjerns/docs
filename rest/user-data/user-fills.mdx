@@ -1,6 +1,6 @@
 ---
 title: "Fill History"
-openapi: "GET /exchange/user/fills"
+openapi: "GET /v2/user/fills"
 ---
 
 User's recent fill history with PnL.
@@ -8,5 +8,5 @@ User's recent fill history with PnL.
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/exchange/user/fills?address=0xc64cc00b46150e9274d09efc945c951710c4ef02"
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/user/fills?address=0xc64cc00b46150e9274d09efc945c951710c4ef02"
 ```

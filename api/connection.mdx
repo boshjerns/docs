@@ -15,8 +15,7 @@ Pass your API key as a query parameter. Keys are prefixed with `pn_live_`.
 
 | Network | Endpoint | Volume | Description |
 |---------|----------|--------|-------------|
-| Mainnet | `wss://hyper.polynode.dev/ws` | ~1,300 events/sec (both layers) | HyperLiquid production chain |
-| Testnet | `wss://hyper.polynode.dev/ws-testnet` | ~30-50 actions/sec | HyperLiquid testnet, HIP-4 active |
+| Mainnet | `wss://hyper.polynode.dev/ws` | ~6,500 events/sec (both layers) | HyperLiquid production chain |
 
 ## Latency
 
@@ -36,3 +35,19 @@ Response:
 ```json
 {"action": "pong"}
 ```
+
+## Reconnection
+
+There is no event replay or gap-fill mechanism. If your connection drops, you may miss events during the disconnection window. Reconnect immediately with exponential backoff:
+
+```typescript
+let delay = 500;
+ws.onclose = () => {
+  setTimeout(() => {
+    delay = Math.min(delay * 2, 10000);
+    connect(); // re-establish and re-subscribe
+  }, delay);
+};
+```
+
+On successful reconnect, reset your delay and re-send all subscription messages.

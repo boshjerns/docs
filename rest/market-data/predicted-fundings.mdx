@@ -1,6 +1,6 @@
 ---
 title: "Predicted Fundings"
-openapi: "GET /exchange/funding-rates"
+openapi: "GET /v2/funding-rates"
 ---
 
 Predicted funding rates for the next funding interval per asset.
@@ -10,7 +10,7 @@ Returns an array of `[asset, venues]` pairs, where each venue provides its predi
 ## Example
 
 ```bash
-curl https://hyper.polynode.dev/exchange/funding-rates
+curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/funding-rates
 ```
 
 ```json

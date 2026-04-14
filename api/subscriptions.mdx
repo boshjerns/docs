@@ -90,7 +90,7 @@ Cancel and modify actions before they are committed. Arrives ~1 second early.
 ```json
 {"action": "subscribe", "filters": {"action_types": ["order"]}}
 ```
-The `"order"` umbrella matches: `order`, `order_filled`, `order_canceled`, `order_rejected`.
+The `"order"` umbrella matches: `order`, `order_filled`, `order_canceled`, `order_rejected`. New resting orders have type `order` with `data.status: "open"`.
 
 **Prediction markets:**
 ```json

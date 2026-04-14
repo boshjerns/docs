@@ -1,6 +1,6 @@
 ---
 title: "Vault Deposits"
-openapi: "GET /exchange/user/vaults"
+openapi: "GET /v2/user/vaults"
 ---
 
 Vault deposits and equity positions for the user.
@@ -8,5 +8,5 @@ Vault deposits and equity positions for the user.
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/exchange/user/vaults?address=0x..."
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/user/vaults?address=0x..."
 ```

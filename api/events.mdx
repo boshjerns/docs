@@ -41,12 +41,12 @@ Pre-consensus events are raw user-submitted actions intercepted from the gossip 
 | `type` | string | Event type (see table below) |
 | `consensus` | string | `"pre"` (gossip) or `"confirmed"` (node) |
 | `timestamp` | number | Unix milliseconds |
+| `block` | number | L1 block number. Populated for pre-consensus events; `0` for confirmed events |
 | `user` | string | Wallet address |
-| `asset` | string | Human-readable asset name |
-| `asset_id` | number | Numeric asset identifier (pre-consensus events only) |
-| `data` | object | Event-specific payload |
+| `asset` | string | Human-readable asset name. Absent on `scheduleCancel` and `setReferrer` |
+| `asset_id` | number | Numeric asset identifier. Present on pre-consensus events; may be absent on some confirmed events |
+| `data` | any | Event-specific payload. Usually an object, but a number for `scheduleCancel` and a string for `setReferrer` |
 | `network` | string | `"mainnet"` or `"testnet"` |
-| `block` | number | L1 block number (pre-consensus events only) |
 
 ## Event types
 
@@ -56,12 +56,18 @@ These appear after the validator processes the action. Every order placed on Hyp
 
 | Type | Description | Key data fields |
 |------|-------------|-----------------|
-| `order_open` | New resting limit order | coin, side, px, sz, oid, tif |
+| `order` | New resting limit order (`data.status` is `"open"`) | coin, side, px, sz, oid, tif |
 | `order_filled` | Order filled immediately | coin, side, px, sz, oid |
 | `order_canceled` | Order was canceled | coin, side, px, sz, oid |
-| `order_rejected` | Order rejected (see `data.status` for reason) | coin, side, px, sz, reject_reason |
+| `order_rejected` | Order rejected (see rejection reasons below) | coin, side, px, sz, status |
 | `fill` | Trade execution | coin, side, px, sz, dir, closedPnl, fee |
-| `triggered` | Trigger/stop order activated | coin, side, px, sz |
+| `triggered` | Trigger/stop order activated (rare) | coin, side, px, sz |
+| `siblingFilledCanceled` | Sibling order canceled due to fill (rare) | coin, side, px, sz, oid |
+| `perpMaxPositionRejected` | Rejected due to max position limit (rare) | coin, side, px, sz |
+
+<Note>
+The `"order"` type name covers new resting orders where `data.status` is `"open"`. There is no separate `order_open` type on the wire. To identify new resting orders, filter for `"order"` and check `data.status === "open"`.
+</Note>
 
 Rejection reasons in `data.status`: `badAloPxRejected`, `perpMarginRejected`, `insufficientSpotBalanceRejected`, `iocCancelRejected`, `reduceOnlyCanceled`, `reduceOnlyRejected`, `minTradeNtlRejected`, `selfTradeCanceled`.
 
@@ -74,8 +80,8 @@ These arrive before the validator commits them to a block:
 | `cancel` | Cancel by order ID | cancels[].asset, cancels[].oid |
 | `cancelByCloid` | Cancel by client order ID | cancels[].asset, cancels[].cloid |
 | `batchModify` | Modify existing orders | modifies[].oid, modifies[].order.price/size |
-| `scheduleCancel` | Dead man's switch | timestamp of scheduled cancel |
-| `setReferrer` | Set referral code | referral code string |
+| `scheduleCancel` | Dead man's switch | `data` is a number (cancel timestamp) |
+| `setReferrer` | Set referral code | `data` is a string (referral code) |
 | `evmRawTx` | EVM transaction | calldataLen, chainId, gas |
 
 ## Confirmed order example
@@ -84,7 +90,7 @@ These arrive before the validator commits them to a block:
 {
   "block": 0,
   "timestamp": 1776147483883,
-  "type": "order_open",
+  "type": "order",
   "consensus": "confirmed",
   "user": "0xfc667adba8d4e79a22cac8e8f6d2a5b5c17cfa94",
   "asset": "BTC",
@@ -164,7 +170,7 @@ Events for HIP-4 outcome tokens include a `prediction` object in the data:
 
 ```json
 {
-  "type": "order_open",
+  "type": "order",
   "consensus": "confirmed",
   "asset": "#39890",
   "data": {

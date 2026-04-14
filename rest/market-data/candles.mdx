@@ -10,7 +10,7 @@ Supported intervals: `1m`, `5m`, `15m`, `1h`, `4h`, `1d`.
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/exchange/candles?coin=BTC&interval=1h&start_time=1776000000000&end_time=1776090000000"
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/candles?coin=BTC&interval=1h&start_time=1776000000000&end_time=1776090000000"
 ```
 
 ```json

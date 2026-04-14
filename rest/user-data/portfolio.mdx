@@ -1,6 +1,6 @@
 ---
 title: "Portfolio History"
-openapi: "GET /exchange/user/portfolio"
+openapi: "GET /v2/user/portfolio"
 ---
 
 Historical portfolio value over time.
@@ -8,5 +8,5 @@ Historical portfolio value over time.
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/exchange/user/portfolio?address=0x..."
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/user/portfolio?address=0x..."
 ```

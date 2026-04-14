@@ -1,6 +1,6 @@
 ---
 title: "Sub-Accounts"
-openapi: "GET /exchange/user/sub-accounts"
+openapi: "GET /v2/user/sub-accounts"
 ---
 
 Sub-accounts owned by the wallet.
@@ -8,5 +8,5 @@ Sub-accounts owned by the wallet.
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/exchange/user/sub-accounts?address=0x..."
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/user/sub-accounts?address=0x..."
 ```

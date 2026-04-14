@@ -1,6 +1,6 @@
 ---
 title: "All Prices"
-openapi: "GET /exchange/prices"
+openapi: "GET /v2/all-mids"
 ---
 
 Returns mid prices for every tradeable asset on HyperLiquid (perps + spot pairs + variants).
@@ -10,7 +10,7 @@ Updated every 2 seconds. Includes all 537 assets.
 ## Example
 
 ```bash
-curl https://hyper.polynode.dev/exchange/prices
+curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/all-mids
 ```
 
 ```json

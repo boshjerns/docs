@@ -1,6 +1,6 @@
 ---
 title: "Referrals"
-openapi: "GET /exchange/user/referrals"
+openapi: "GET /v2/user/referral"
 ---
 
 Referral code, referees, and earnings.
@@ -8,5 +8,5 @@ Referral code, referees, and earnings.
 ## Example
 
 ```bash
-curl "https://hyper.polynode.dev/exchange/user/referrals?address=0x..."
+curl -H "x-api-key: YOUR_KEY" "https://hyper.polynode.dev/v2/user/referral?address=0x..."
 ```
