@@ -34,6 +34,7 @@ Based on live mainnet sampling (~6,500 events per 5 seconds):
 | `batchModify` | pre | ~1% | Order price/size modification |
 | `order_filled` | confirmed | <1% | Immediately filled orders |
 | `scheduleCancel` | pre | <1% | Dead man's switch |
+| `evmRawTx` | pre | <1% | HyperEVM smart contract calls |
 
 ## Confirmed event types
 
@@ -85,7 +86,65 @@ These arrive from the gossip protocol before the validator commits them:
 | `batchModify` | Modify order price/size | `modifies[].oid`, `modifies[].order` |
 | `scheduleCancel` | Dead man's switch | Timestamp of scheduled cancel |
 | `setReferrer` | Set referral code | Referral code string |
-| `evmRawTx` | EVM transaction | `calldataLen`, `chainId`, `gas` |
+| `evmRawTx` | Pre-block HyperEVM transaction | `data` (raw signed TX hex) |
+
+
+## Pre-block HyperEVM transactions
+
+Every HyperEVM smart contract interaction appears in the stream as an `evmRawTx` event **before** it is included in a block. HyperLiquid's public RPC does not expose pending transactions (`eth_pendingTransactions` returns "Method not found"), so the hypernode stream is the only way to see these transactions pre-block.
+
+```json
+{
+  "block": 2641,
+  "timestamp": 1776204147470,
+  "type": "evmRawTx",
+  "consensus": "pre",
+  "user": "0x000000360c9f4b00...",
+  "data": "f901588206958406194dcd83059491...",
+  "network": "mainnet"
+}
+```
+
+The `data` field contains the full RLP-encoded signed transaction. Decode it with any standard Ethereum library to extract:
+
+- **To address** -- which contract is being called
+- **Function selector** -- which function (first 4 bytes of calldata)
+- **Calldata** -- full encoded parameters
+- **Value** -- ETH/HYPE sent with the call
+- **Gas limit and gas price**
+
+### Decoding example (Python)
+
+```python
+import rlp
+from eth_hash.auto import keccak
+
+def decode_evm_event(event):
+    raw = bytes.fromhex(event["data"])
+    # EIP-2718 typed transaction (type 2 = EIP-1559)
+    tx_type = raw[0]
+    decoded = rlp.decode(raw[1:])
+    return {
+        "tx_hash": "0x" + keccak(raw).hex(),
+        "to": "0x" + decoded[5].hex(),
+        "value": int.from_bytes(decoded[6], "big"),
+        "calldata": decoded[7].hex(),
+        "function_selector": "0x" + decoded[7][:4].hex(),
+    }
+```
+
+### Use cases
+
+- **DeFi monitoring** -- see swaps, lending actions, and liquidity changes on HyperEVM before they settle
+- **MEV detection** -- identify arbitrage and liquidation transactions in flight
+- **Contract activity tracking** -- monitor specific contracts for pre-block interactions
+- **Gas analytics** -- analyze gas pricing patterns on HyperEVM
+
+### Subscribing to EVM transactions only
+
+```json
+{"action": "subscribe", "filters": {"action_types": ["evmRawTx"]}}
+```
 
 ## HIP-4 prediction market events
 

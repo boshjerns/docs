@@ -63,7 +63,7 @@ Combined with the HyperCore trading API, one hypernode key gives you both chains
 
 **No debug/trace.** `debug_traceTransaction` and trace methods are not available.
 
-**No mempool.** `eth_pendingTransactions` is not supported. Pending transactions are only visible to validators.
+**No mempool via RPC.** `eth_pendingTransactions` and `txpool_content` are not supported on HyperLiquid's RPC. However, hypernode streams pre-block EVM transactions via the WebSocket as `evmRawTx` events. Subscribe with `{"action": "subscribe", "filters": {"action_types": ["evmRawTx"]}}` to see every HyperEVM transaction before it is included in a block. See [Event Types](/actions/overview) for details.
 
 ## Use cases
 

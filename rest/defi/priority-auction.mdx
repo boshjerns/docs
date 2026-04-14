@@ -1,66 +1,66 @@
 ---
 title: Priority Auction
 sidebarTitle: Priority Auction
-description: MEV priority gas auction status for gossip data stream slots
+description: Real-time gossip priority auction status — bid slots, gas pricing, and cycle timing
+api: GET /v2/gossip-priority-auction
 ---
 
-HyperLiquid runs a priority fee system where builders bid for faster data delivery. Five independent Dutch auction slots cycle every 3 minutes. Winning a slot gives your IP address priority ordering in the gossip data stream, reducing latency by roughly 10ms per slot. Slot 0 is best.
+Returns the current state of all priority fee auction slots. HyperLiquid runs two types of priority auctions: write priority (order execution) and read priority (data access).
 
-## Endpoint
-
-```
-GET /v2/gossip-priority-auction
-```
+<Note>
+Priority fees launched on HyperLiquid mainnet in April 2026. Write priority applies to IOC orders on HIP-3 assets (max 8 bps). Read priority runs 5 auction slots on 3-minute cycles.
+</Note>
 
 ## Response
+
+The response is a 2-element array: `[write_slots, read_slots]`.
 
 ```json
 [
   [null, null, null, null, null],
   [
     {
-      "startTimeSeconds": 1776168540,
+      "startTimeSeconds": 1776203460,
       "durationSeconds": 180,
       "startGas": "0.1",
       "currentGas": "0.1",
+      "endGas": null
+    },
+    {
+      "startTimeSeconds": 1776203460,
+      "durationSeconds": 180,
+      "startGas": "0.1",
+      "currentGas": "0.068",
       "endGas": null
     }
   ]
 ]
 ```
 
-The response is a 2-element array:
+### Write slots (index 0)
 
-**Element 0: Previous winners** — array of 5 slots. `null` if nobody won that slot in the last cycle. When a slot is won, contains the winning bid details.
+5 slots for order execution priority. `null` means no active auction for that slot.
 
-**Element 1: Current auctions** — array of 5 active Dutch auctions, one per slot.
+### Read slots (index 1)
 
-| Field | Type | Description |
-|-------|------|-------------|
-| `startTimeSeconds` | number | Unix timestamp when this 3-minute auction began |
-| `durationSeconds` | number | Always 180 (3 minutes) |
-| `startGas` | string | Starting price in HYPE (10x previous winner, floor 0.1) |
-| `currentGas` | string | Current price, decreasing linearly over the 180 seconds |
-| `endGas` | string\|null | Final price at auction end. `null` if auction is still running |
+5 slots for data access priority. Each active slot contains:
 
-## How bidding works
+<ResponseField name="startTimeSeconds" type="integer">
+  Unix timestamp when this auction cycle began.
+</ResponseField>
 
-Builders submit a `gossipPriorityBid` action specifying the slot index (0-4), their IP address, and a max gas amount in HYPE. The bid succeeds if the max gas meets or exceeds the current auction price. Gas is charged from spot HYPE balance and burned.
+<ResponseField name="durationSeconds" type="integer">
+  Cycle length in seconds. Currently 180 (3 minutes).
+</ResponseField>
 
-Lower slot index = higher priority. All 5 slots reset simultaneously every 3 minutes.
+<ResponseField name="startGas" type="string">
+  Starting gas price in HYPE at the beginning of the cycle.
+</ResponseField>
 
-## Use cases
+<ResponseField name="currentGas" type="string">
+  Current gas price in HYPE. Decays linearly from `startGas` toward zero over `durationSeconds`.
+</ResponseField>
 
-- **MEV monitoring:** Track which slots are being bid on and at what price. Rising gas prices signal competitive activity.
-- **Cost analysis:** Calculate the cost of priority access over time.
-- **Market regime detection:** During volatile markets, priority slots get expensive. During quiet periods, all slots sit at the 0.1 HYPE floor.
-
-## Example
-
-```bash
-curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/gossip-priority-auction
-```
-
-<Note>
-There is also a separate **order priority** system for faster IOC order execution on HIP-3 assets. Order priority fees appear as a `priorityGas` field on fill events in the stream. That system is independent of these gossip data slots.
-</Note>
+<ResponseField name="endGas" type="string | null">
+  Gas price when the auction was won. `null` if no winner yet in this cycle.
+</ResponseField>

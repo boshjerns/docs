@@ -1,11 +1,11 @@
 ---
 title: "Gas Auctions"
 sidebarTitle: "Gas Auctions"
-description: "Dutch auction system for asset deployment gas pricing and the upcoming priority fee infrastructure on HyperLiquid."
+description: "Dutch auction system for asset deployment gas pricing and the live priority fee infrastructure on HyperLiquid."
 icon: "gavel"
 ---
 
-HyperLiquid uses a Dutch auction mechanism to price gas for deploying new assets. Three separate auction systems exist within the protocol: perp market deployment, spot pair deployment, and a future priority transaction inclusion auction.
+HyperLiquid uses a Dutch auction mechanism to price gas for deploying new assets. Three separate auction systems exist within the protocol: perp market deployment, spot pair deployment, and the priority fee system (live since April 2026).
 
 ## Dutch Auction Mechanism
 
@@ -100,45 +100,71 @@ Spot pair deployment starts at half the cost of perp deployment (500 vs 1,000 HY
   A `currentGas` equal to `startGas` indicates the auction just restarted or no time has elapsed in the current cycle.
 </Note>
 
-## Priority Transaction Inclusion (GossipPriorityBid)
+## Priority Fees (Live)
 
-The protocol includes infrastructure for a third auction type: priority transaction inclusion. This system is not yet active on mainnet but the action type and state structures exist in the protocol.
+HyperLiquid launched priority fees on mainnet in April 2026. Two mechanisms exist:
 
-### Action Structure
+### Write Priority (Order Priority Fees)
 
+A fee parameter on IOC orders for HIP-3 assets. Paying HYPE gets your order executed with higher priority.
+
+| Parameter | Value |
+|-----------|-------|
+| Max fee | 8 bps |
+| Applies to | IOC orders on HIP-3 assets |
+| Denomination | HYPE |
+
+Orders with priority fees carry `builderFee` and `builder` fields in their fill events.
+
+### Read Priority (Gossip Auction)
+
+A Dutch auction system where participants bid for priority data access. 5 slots run 180-second (3 minute) auction cycles.
+
+```json
+// Query via hypernode REST API
+GET /v2/gossip-priority-auction
+
+// Response: [write_slots, read_slots]
+[
+  [null, null, null, null, null],
+  [
+    {
+      "startTimeSeconds": 1776203460,
+      "durationSeconds": 180,
+      "startGas": "0.1",
+      "currentGas": "0.1",
+      "endGas": null
+    }
+  ]
+]
 ```
-GossipPriorityBidAction {
-  slotId: u32       // which priority slot to bid on
-  ip: String        // bidder's node IP
-  maxGas: u64       // maximum gas willing to pay
-}
+
+| Parameter | Value |
+|-----------|-------|
+| Slots | 5 |
+| Cycle duration | 180 seconds (3 minutes) |
+| Start gas | 0.1 HYPE |
+| Denomination | HYPE |
+
+### Querying Priority Auction Status
+
+```python
+import requests
+
+# Via hypernode
+resp = requests.get(
+    "https://hyper.polynode.dev/v2/gossip-priority-auction",
+    headers={"x-api-key": "YOUR_KEY"}
+)
+print(resp.json())
+
+# Via HyperLiquid directly
+resp = requests.post(
+    "https://api.hyperliquid.xyz/info",
+    json={"type": "gossipPriorityAuctionStatus"}
+)
+print(resp.json())
 ```
-
-This action is registered alongside standard user actions (order, cancel, batchModify, etc.), meaning priority bids will be submitted as regular L1 actions when enabled.
-
-### Design Characteristics
-
-- **Multiple slots** -- the `slotId` field indicates multiple priority tiers, not a single fast lane
-- **IP-based** -- the `ip` field suggests latency or location may factor into priority assignment
-- **Gas-denominated** -- bidders specify `maxGas` they are willing to pay, following the same gas denomination as deployment auctions
-
-### State Structures
-
-The protocol maintains dedicated state for priority auctions:
-
-| Structure | Purpose |
-|-----------|---------|
-| `GossipPriorityGasAuction` | Active auction state (multiple slots) |
-| `GossipPriorityParams` | Global auction parameters |
-| `NodeGossipPriorityConfig` | Per-node participation configuration |
-
-### Current Status
-
-<Warning>
-  The priority bid system is not yet active on mainnet. Querying the API for priority auction status currently returns a 422 error. The code and state structures exist in the protocol, but governance has not enabled it.
-</Warning>
-
-When activated, this will function as HyperLiquid's native MEV infrastructure, allowing users to bid for priority transaction ordering without relying on external block builders or searcher infrastructure.
 
 ## Deployer Fee Share
 
