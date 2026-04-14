@@ -154,6 +154,12 @@
               "rest/passthrough/info",
               "rest/passthrough/raw"
             ]
+          },
+          {
+            "group": "Infrastructure",
+            "pages": [
+              "rest/evm-rpc"
+            ]
           }
         ]
       },
