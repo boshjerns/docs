@@ -1,6 +1,6 @@
 ---
 title: Filters
-description: Filter the event stream by action type, asset, address, or asset ID
+description: Filter the event stream by type, asset, address, or consensus layer
 ---
 
 Filters narrow the event stream to only matching events. All filter dimensions use **AND** logic: if multiple filters are specified, an event must match all of them.
@@ -9,55 +9,64 @@ Filters narrow the event stream to only matching events. All filter dimensions u
 
 | Field | Type | Match Logic | Case |
 |-------|------|-------------|------|
-| `action_types` | `string[]` | Exact match on event `type` | Case-sensitive |
-| `addresses` | `string[]` | Match on event `user` field | Case-insensitive (auto-lowercased) |
-| `assets` | `string[]` | Match on event `asset` field | Case-insensitive (auto-uppercased) |
-| `asset_ids` | `number[]` | Match on event `asset_id` field | Exact numeric equality |
+| `action_types` | `string[]` | Match on event `type` | Case-sensitive |
+| `addresses` | `string[]` | Match on event `user` | Case-insensitive |
+| `assets` | `string[]` | Match on event `asset` | Case-insensitive |
+| `asset_ids` | `number[]` | Match on event `asset_id` | Exact numeric |
 
 ## Behavior
 
 - **Omitted filter** = matches everything (no restriction on that dimension)
-- **Empty array** `[]` = matches nothing (blocks all events)
-- **Firehose** = subscribe with no `filters` field at all
+- **Empty array** `[]` = matches nothing
+- **No `filters` field** = firehose (all events)
+
+## Umbrella types
+
+Some type names match a group of related events:
+
+| Filter value | Matches |
+|-------------|---------|
+| `"order"` | `order_open`, `order_filled`, `order_canceled`, `order_rejected` |
+| `"fill"` | `fill` |
+| `"cancel"` | `cancel` |
+| `"cancelByCloid"` | `cancelByCloid` |
+| `"batchModify"` | `batchModify` |
+
+You can also use exact type names like `"order_open"` to match a single event type.
 
 ## Examples
 
-**All BTC activity:**
+**All orders and fills (most common):**
 ```json
-{"action": "subscribe", "filters": {"assets": ["BTC"]}}
+{"action": "subscribe", "filters": {"action_types": ["order", "fill"]}}
+```
+Returns: every new order, filled order, canceled order, rejected order, and every trade execution.
+
+**Only BTC orders:**
+```json
+{"action": "subscribe", "filters": {"action_types": ["order"], "assets": ["BTC"]}}
 ```
 
-Verified output:
-```json
-{"action":"subscribed","id":"default","sub_id":4,"total_subs":1}
-```
-Then only BTC events arrive:
-```json
-{"block":70874222,"type":"cancelByCloid","asset":"BTC","asset_id":0,...}
-```
-
-**Only cancel events:**
-```json
-{"action": "subscribe", "filters": {"action_types": ["cancel", "cancelByCloid"]}}
-```
-
-**Track a specific address:**
+**Track a specific wallet:**
 ```json
 {"action": "subscribe", "filters": {"addresses": ["0xd071d6d6ea52f5aa34b79e47f908ee48c8215837"]}}
 ```
+Returns all events from this address across both consensus layers.
 
-Verified: all events returned match the subscribed address exactly.
-
-**Combined filter (AND logic) — ETH orders only:**
+**Pre-consensus cancels only:**
 ```json
-{"action": "subscribe", "filters": {"action_types": ["order"], "assets": ["ETH"]}}
+{"action": "subscribe", "filters": {"action_types": ["cancel", "cancelByCloid"]}}
 ```
+These arrive before the cancel is committed to a block.
 
-Both conditions must match. An ETH cancel would not be delivered. A BTC order would not be delivered.
-
-**Track by raw asset ID:**
+**Full firehose (everything):**
 ```json
-{"action": "subscribe", "filters": {"asset_ids": [0]}}
+{"action": "subscribe"}
 ```
+~6,500 events per 5 seconds on mainnet. Includes both pre-consensus and confirmed events.
 
-Asset ID 0 = BTC. See [Events](/api/events) for the full asset ID encoding.
+**Prediction market activity:**
+```json
+{"action": "subscribe", "filters": {"assets": ["#39890"]}}
+```
+Track a specific outcome token. Use the `#` coin name format.

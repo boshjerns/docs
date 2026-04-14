@@ -1,116 +1,112 @@
 ---
-title: "Action Types Overview"
+title: "Event Types"
 sidebarTitle: "Overview"
-description: "All 53 recognized action types on HyperLiquid"
+description: "All event types in the hypernode unified stream"
 ---
+
+## Two layers in one stream
+
+hypernode merges two data sources into a single WebSocket stream:
+
+<CardGroup cols={2}>
+  <Card title="Pre-consensus" icon="bolt">
+    Cancel and modify actions from the gossip protocol, before validators commit them. ~1 second ahead of the public API.
+  </Card>
+  <Card title="Confirmed" icon="check">
+    Every order, fill, cancellation, and rejection from the non-validator node, after block commit.
+  </Card>
+</CardGroup>
+
+Every event has a `consensus` field: `"pre"` or `"confirmed"`.
 
 ## Volume distribution
 
-Based on live mainnet sampling (~15,000 events in 15 seconds). Ratios shift over time as market activity changes:
+Based on live mainnet sampling (~6,500 events per 5 seconds):
 
-| Action | Share | Description |
-|--------|-------|-------------|
-| `cancelByCloid` | ~54% | Cancel orders by client order ID |
-| `cancel` | ~40% | Cancel orders by order ID |
-| `batchModify` | ~4% | Batch modify existing orders |
-| `scheduleCancel` | &lt;1% | Schedule future cancellation |
-| `setReferrer` | &lt;0.1% | Set referral code |
-| All others | &lt;0.1% | Orders, transfers, governance, HIP-4, etc. |
+| Event | Layer | Share | Description |
+|-------|-------|-------|-------------|
+| `order_rejected` | confirmed | ~35% | Orders rejected (ALO price, margin, etc.) |
+| `order_open` | confirmed | ~16% | New resting limit orders |
+| `cancelByCloid` | pre | ~11% | Cancel by client order ID |
+| `cancel` | pre | ~6% | Cancel by order ID |
+| `order_canceled` | confirmed | ~5% | Confirmed cancellation |
+| `fill` | confirmed | ~1.5% | Trade execution with PnL |
+| `batchModify` | pre | ~1% | Order price/size modification |
+| `order_filled` | confirmed | <1% | Immediately filled orders |
+| `scheduleCancel` | pre | <1% | Dead man's switch |
 
-The stream is dominated by high-frequency market maker operations. Rarer action types (orders, transfers, governance) appear less frequently but carry high signal value.
+## Confirmed event types
 
-All events include resolved asset names. 100% coverage across all 229 perps, 288 spot pairs, and all margin variants.
+These are produced by the HyperLiquid matching engine after processing each action:
 
-## Formatted vs raw
+### Orders
 
-22 action types have dedicated formatters that produce named JSON fields (e.g., `"side": "buy"`, `"price": "67881.0"`). The remaining 31 types pass through as raw JSON arrays. Raw events are still valid JSON, just with positional rather than named fields.
+| Type | What happened |
+|------|--------------|
+| `order_open` | New limit order is resting on the book |
+| `order_filled` | Order was filled immediately (IOC, market) |
+| `order_canceled` | Order was canceled (confirmed) |
+| `order_rejected` | Order was rejected — check `data.status` for reason |
+| `triggered` | Trigger/stop order was activated |
 
-## All 53 action types
+Order data fields: `coin`, `side` (A=sell, B=buy), `px` (price), `sz` (size), `oid`, `tif`, `orderType`, `cloid`, `hash`, `builder`, `reduceOnly`, `origSz`.
 
-### Trading (11)
-| Type | Formatted | Description |
-|------|-----------|-------------|
-| `order` | Yes | Place new orders |
-| `cancel` | Yes | Cancel by order ID |
-| `cancelByCloid` | Yes | Cancel by client order ID |
-| `batchModify` | Yes | Batch modify existing orders |
-| `modify` | Yes | Modify a single order |
-| `scheduleCancel` | Yes | Dead-man's switch cancel |
-| `updateLeverage` | Yes | Change leverage |
-| `updateIsolatedMargin` | Yes | Adjust isolated margin |
-| `topUpIsolatedOnlyMargin` | | Top up isolated margin |
-| `twapOrder` | Yes | Place TWAP order |
-| `twapCancel` | Yes | Cancel TWAP order |
+### Fills
 
-### Account (12)
-| Type | Formatted | Description |
-|------|-----------|-------------|
-| `setReferrer` | | Set referral code |
-| `approveAgent` | Yes | Authorize trading agent |
-| `approveBuilderFee` | | Approve builder fee |
-| `userSetAbstraction` | | Set account abstraction |
-| `agentSetAbstraction` | | Agent set abstraction |
-| `agentEnableDexAbstraction` | | Enable DEX abstraction |
-| `userPortfolioMargin` | | Enable portfolio margin |
-| `startFeeTrial` | | Start fee trial |
-| `claimRewards` | | Claim rewards |
-| `setDisplayName` | | Set display name |
-| `convertToMultiSigUser` | | Convert to multi-sig |
-| `reassessFees` | | Reassess fee tier |
+| Type | What happened |
+|------|--------------|
+| `fill` | A trade was executed |
 
-### Transfers (9)
-| Type | Formatted | Description |
-|------|-----------|-------------|
-| `withdraw3` | Yes | Withdraw to external chain |
-| `usdSend` | Yes | Internal USDC transfer |
-| `borrowLend` | | Borrow or lend |
-| `userDexAbstraction` | | DEX abstraction transfer |
-| `subAccountTransfer` | Yes | Sub-account transfer |
-| `subAccountSpotTransfer` | | Sub-account spot transfer |
-| `vaultTransfer` | Yes | Vault deposit/withdraw |
-| `sendToEvmWithData` | | Send to EVM with calldata |
-| `sendAsset` | | Send a specific asset |
+Fill data fields: `coin`, `side`, `px`, `sz`, `dir` (Open Long/Close Short/etc.), `closedPnl`, `fee`, `feeToken`, `oid`, `tid`, `hash`, `crossed`, `builder`, `builderFee`.
 
-### Vaults (3)
-| Type | Formatted | Description |
-|------|-----------|-------------|
-| `createVault` | | Create a new vault |
-| `vaultModify` | | Modify vault parameters |
-| `vaultDistribute` | | Distribute vault earnings |
+### Rejection reasons
 
-### Governance & Staking (4)
-| Type | Formatted | Description |
-|------|-----------|-------------|
-| `govPropose` | | Submit governance proposal |
-| `govVote` | Yes | Vote on proposal |
-| `tokenDelegate` | Yes | Delegate/undelegate tokens |
-| `linkStakingUser` | | Link staking user |
+When `type` is `order_rejected`, the `data.status` field contains the specific reason:
 
-### Deployers (5)
-| Type | Formatted | Description |
-|------|-----------|-------------|
-| `spotDeploy` | | Deploy spot token |
-| `perpDeploy` | | Deploy perp market |
-| `finalizeEvmContract` | | Finalize EVM contract |
-| `evmUserModify` | | Modify EVM user |
-| `reserveRequestWeight` | | Reserve request weight |
+| Status | Meaning |
+|--------|---------|
+| `badAloPxRejected` | ALO order price would cross the spread |
+| `perpMarginRejected` | Insufficient margin for perp order |
+| `insufficientSpotBalanceRejected` | Insufficient spot balance |
+| `iocCancelRejected` | IOC order could not fill |
+| `reduceOnlyCanceled` | Reduce-only order has no position to reduce |
+| `reduceOnlyRejected` | Reduce-only order rejected |
+| `minTradeNtlRejected` | Below minimum trade notional |
+| `selfTradeCanceled` | Self-trade prevention triggered |
 
-### HIP-4 Prediction Markets (13)
+## Pre-consensus event types
 
-<Note>HIP-4 prediction markets are currently live on **testnet only**. They will launch on mainnet as part of the HIP-4 rollout.</Note>
+These arrive from the gossip protocol before the validator commits them:
 
-| Type | Formatted | Description |
-|------|-----------|-------------|
-| `userOutcome` | Yes | Trade outcome token |
-| `splitOutcome` | Yes | Split into outcome tokens |
-| `mergeOutcome` | Yes | Merge outcome tokens |
-| `mergeQuestion` | Yes | Merge question outcomes |
-| `negateOutcome` | Yes | Negate outcome position |
-| `registerQuestion` | | Register prediction question |
-| `registerOutcome` | | Register prediction outcome |
-| `registerNamedOutcome` | | Register named outcome |
-| `registerOutcomeToken` | | Register outcome token |
-| `registerTokensAndStandaloneOutcome` | | Register tokens + outcome |
-| `settleOutcome` | | Settle a prediction market |
-| `changeOutcomeDescription` | | Update outcome description |
-| `changeQuestionDescription` | | Update question description |
+| Type | Description | Data fields |
+|------|-------------|-------------|
+| `cancel` | Cancel orders by OID | `cancels[].asset`, `cancels[].oid` |
+| `cancelByCloid` | Cancel by client order ID | `cancels[].asset`, `cancels[].cloid` |
+| `batchModify` | Modify order price/size | `modifies[].oid`, `modifies[].order` |
+| `scheduleCancel` | Dead man's switch | Timestamp of scheduled cancel |
+| `setReferrer` | Set referral code | Referral code string |
+| `evmRawTx` | EVM transaction | `calldataLen`, `chainId`, `gas` |
+
+## HIP-4 prediction market events
+
+<Note>HIP-4 prediction markets are currently on **testnet only**. When they launch on mainnet, all prediction market orders and fills will appear in the stream with a `prediction` metadata object.</Note>
+
+Prediction market events use the same types (`order_open`, `fill`, etc.) but with outcome token coin names (`#39890`) and additional metadata:
+
+```json
+{
+  "type": "fill",
+  "consensus": "confirmed",
+  "asset": "#39890",
+  "data": {
+    "coin": "#39890",
+    "prediction": {
+      "outcome_id": 3989,
+      "side_index": 0,
+      "asset_id": 100039890
+    }
+  }
+}
+```
+
+See [Prediction Markets](/actions/prediction-markets) for the full reference.

@@ -3,66 +3,192 @@ title: Event Format
 description: Structure of every event delivered by hypernode
 ---
 
-## Event structure
+## Two consensus layers
 
-Every event is a JSON object:
+hypernode merges two data sources into one stream. Every event is tagged with its consensus state:
+
+| Layer | `consensus` | What you see | Latency |
+|-------|-------------|-------------|---------|
+| **Pre-consensus** | `"pre"` | Cancel and modify actions before block commit | ~1s ahead of public API |
+| **Confirmed** | `"confirmed"` | Every order, fill, cancellation, rejection after block commit | ~0.5s behind live |
+
+Pre-consensus events are raw user-submitted actions intercepted from the gossip protocol before validators commit them. Confirmed events are the validator output after matching, filling, or rejecting.
+
+## Event structure
 
 ```json
 {
-  "block": 70873194,
-  "timestamp": 1774938185046,
+  "block": 70852325,
+  "timestamp": 1776147484247,
   "type": "cancel",
-  "user": "0x034d4f0b00827e4ac77d910071377f707ddd23d3",
-  "asset": "SOL",
-  "asset_id": 5,
+  "consensus": "pre",
+  "user": "0x31ca8395cf837de08b24da3f660e77761dfb974b",
+  "asset": "ALGO",
+  "asset_id": 158,
   "data": {
     "cancels": [
-      {"asset": 5, "oid": 366057443270}
+      {"asset": 158, "oid": 380721371885}
     ]
   },
-  "network": "mainnet",
-  "proposer": "0xdf35aee8ef5658686142acd1e5ab5dbcdf8c51e8"
+  "network": "mainnet"
 }
 ```
 
 ## Fields
 
-| Field | Type | Always Present | Description |
-|-------|------|----------------|-------------|
-| `block` | `number` | Yes | HyperLiquid L1 block number |
-| `timestamp` | `number` | Yes | Unix timestamp in milliseconds |
-| `type` | `string` | Yes | Action type (see [Action Types](/actions/overview)) |
-| `data` | `object` | Yes | Action-specific data |
-| `network` | `string` | Yes | `"mainnet"` or `"testnet"` |
-| `user` | `string` | No | Hex address of the user who submitted the action |
-| `asset` | `string` | No | Human-readable asset name (e.g., `"BTC"`, `"SOL"`) |
-| `asset_id` | `number` | No | Numeric asset identifier |
-| `proposer` | `string` | Yes | Hex address of the block proposer (validator) |
+| Field | Type | Description |
+|-------|------|-------------|
+| `type` | string | Event type (see table below) |
+| `consensus` | string | `"pre"` (gossip) or `"confirmed"` (node) |
+| `timestamp` | number | Unix milliseconds |
+| `user` | string | Wallet address |
+| `asset` | string | Human-readable asset name |
+| `asset_id` | number | Numeric asset identifier (pre-consensus events only) |
+| `data` | object | Event-specific payload |
+| `network` | string | `"mainnet"` or `"testnet"` |
+| `block` | number | L1 block number (pre-consensus events only) |
 
-## Coverage
+## Event types
 
-- `user` is present on **100%** of mainnet events, ~98% on testnet
-- `asset` and `asset_id` are present on trading actions but not on account actions like `setReferrer` or `scheduleCancel`
-- **100% asset name coverage** across all market types
+### Confirmed events (from non-validator node)
 
-## Asset ID encoding
+These appear after the validator processes the action. Every order placed on HyperLiquid produces one of these:
 
-| Range | Type | Example |
-|-------|------|---------|
-| 0-228 | Perpetual futures | 0 = BTC, 1 = ETH, 5 = SOL |
-| 10000-10306 | Spot pairs | 10000 = PURR, 10001 = HFUN, 10009 = TRUMP |
-| 110000-170000+ | Spot margin variants | 110029 = GUP, 150001 = HFUN |
-| 1900000+ | Prediction market outcomes | HIP-4 outcome tokens (testnet only) |
+| Type | Description | Key data fields |
+|------|-------------|-----------------|
+| `order_open` | New resting limit order | coin, side, px, sz, oid, tif |
+| `order_filled` | Order filled immediately | coin, side, px, sz, oid |
+| `order_canceled` | Order was canceled | coin, side, px, sz, oid |
+| `order_rejected` | Order rejected (see `data.status` for reason) | coin, side, px, sz, reject_reason |
+| `fill` | Trade execution | coin, side, px, sz, dir, closedPnl, fee |
+| `triggered` | Trigger/stop order activated | coin, side, px, sz |
 
-Spot margin variant IDs (110000+, 120000+, 140000+, 150000+, 170000+) represent the same underlying token in different margin modes. hypernode resolves all variants to their base token name automatically.
+Rejection reasons in `data.status`: `badAloPxRejected`, `perpMarginRejected`, `insufficientSpotBalanceRejected`, `iocCancelRejected`, `reduceOnlyCanceled`, `reduceOnlyRejected`, `minTradeNtlRejected`, `selfTradeCanceled`.
+
+### Pre-consensus events (from gossip protocol)
+
+These arrive before the validator commits them to a block:
+
+| Type | Description | Key data fields |
+|------|-------------|-----------------|
+| `cancel` | Cancel by order ID | cancels[].asset, cancels[].oid |
+| `cancelByCloid` | Cancel by client order ID | cancels[].asset, cancels[].cloid |
+| `batchModify` | Modify existing orders | modifies[].oid, modifies[].order.price/size |
+| `scheduleCancel` | Dead man's switch | timestamp of scheduled cancel |
+| `setReferrer` | Set referral code | referral code string |
+| `evmRawTx` | EVM transaction | calldataLen, chainId, gas |
+
+## Confirmed order example
+
+```json
+{
+  "block": 0,
+  "timestamp": 1776147483883,
+  "type": "order_open",
+  "consensus": "confirmed",
+  "user": "0xfc667adba8d4e79a22cac8e8f6d2a5b5c17cfa94",
+  "asset": "BTC",
+  "data": {
+    "status": "open",
+    "coin": "BTC",
+    "side": "B",
+    "px": "74400.0",
+    "sz": "0.04158",
+    "oid": 380721383669,
+    "orderType": "Limit",
+    "tif": "Alo",
+    "reduceOnly": false,
+    "cloid": "0x000000334e47524d534c363834483736",
+    "hash": "0x9d660b786cd389ac9edf04391b7dd901...",
+    "builder": null,
+    "origSz": "0.04158"
+  },
+  "network": "mainnet"
+}
+```
+
+## Fill example
+
+```json
+{
+  "block": 0,
+  "timestamp": 1776147483883,
+  "type": "fill",
+  "consensus": "confirmed",
+  "user": "0x9690bcfc16394e2bd25b00e83d6b06c9ab3f5de5",
+  "asset": "HYPE",
+  "data": {
+    "coin": "HYPE",
+    "side": "B",
+    "px": "22.608",
+    "sz": "442.0",
+    "dir": "Close Short",
+    "closedPnl": "0.920686",
+    "fee": "0.035973",
+    "feeToken": "USDC",
+    "oid": 380721384070,
+    "tid": 910601406,
+    "hash": "0xa9a32c7c2b7fb452ab1c...",
+    "crossed": true,
+    "builder": null,
+    "builderFee": null
+  },
+  "network": "mainnet"
+}
+```
+
+## Pre-consensus cancel example
+
+```json
+{
+  "block": 70852325,
+  "timestamp": 1776147484247,
+  "type": "cancel",
+  "consensus": "pre",
+  "user": "0x31ca8395cf837de08b24da3f660e77761dfb974b",
+  "asset": "ALGO",
+  "asset_id": 158,
+  "data": {
+    "cancels": [
+      {"asset": 158, "oid": 380721371885},
+      {"asset": 158, "oid": 380721371886}
+    ]
+  },
+  "network": "mainnet"
+}
+```
+
+## Prediction market events
+
+Events for HIP-4 outcome tokens include a `prediction` object in the data:
+
+```json
+{
+  "type": "order_open",
+  "consensus": "confirmed",
+  "asset": "#39890",
+  "data": {
+    "coin": "#39890",
+    "side": "B",
+    "px": "0.95",
+    "sz": "200",
+    "prediction": {
+      "outcome_id": 3989,
+      "side_index": 0,
+      "asset_id": 100039890
+    }
+  }
+}
+```
+
+Outcome token naming: `#{10 * outcome_id + side_index}`. See [Prediction Markets](/actions/prediction-markets) for details.
 
 ## Timestamp
 
-The `timestamp` field is Unix milliseconds. To convert:
+Unix milliseconds. To convert:
 
 ```typescript
 const date = new Date(event.timestamp);
-// 2026-03-31T03:09:45.046Z
 ```
 
 ```python
