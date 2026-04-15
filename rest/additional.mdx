@@ -1,82 +1,107 @@
 ---
 title: Additional Read Endpoints
 sidebarTitle: Additional Endpoints
-description: Vaults, staking, oracle history, TWAP summaries, spot deployment, and validator endpoints
+description: Vaults, staking, oracle history, TWAP summaries, spot deployment, and validator read endpoints
 ---
 
-These endpoints proxy the local HL node for read-only state queries. Responses come from our local non-validator node — no rate limits beyond your plan tier, sub-20ms typical latency.
+These endpoints expose read-only HyperLiquid state queries that aren't covered by the main market data or user data pages. All responses are standard HyperLiquid info API shapes — drop-in compatible with existing code that consumes the public HL info endpoint.
 
 ## Vaults
 
-<ParamField path="GET /v2/vaults" type="endpoint">
-  List every active vault on HyperLiquid. Returns an array of vault summaries (vault address, leader, TVL, PnL history).
-</ParamField>
+### `GET /v2/vaults`
+
+List every active vault on HyperLiquid. Returns an array of vault summaries (vault address, leader, TVL, recent PnL history).
 
 ```bash
 curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/vaults
 ```
 
-<ParamField path="GET /v2/vaults/leading" type="endpoint">
-  Vaults a specific user leads. Pass `?user=0x...` with the leader's address.
-</ParamField>
+**Use case:** building a vault directory page, tracking vault TVL over time, comparing vault performance.
 
-<ParamField path="GET /v2/user/vaults" type="endpoint">
-  Vault equity positions for a specific user. Pass `?user=0x...`.
-</ParamField>
+### `GET /v2/vaults/leading`
 
-## Delegator state
+Vaults led by a specific user. Pass `?user=0x...` with the vault leader's address.
 
-<ParamField path="GET /v2/user/delegator-history" type="endpoint">
-  Historical delegate/undelegate/withdraw events for a user. Pass `?user=0x...`.
-</ParamField>
+**Use case:** showing "vaults led by this user" on a profile page.
 
-<ParamField path="GET /v2/user/delegator-rewards" type="endpoint">
-  Unclaimed and historical staking rewards for a user. Pass `?user=0x...`.
-</ParamField>
+### `GET /v2/user/vaults`
 
-<ParamField path="GET /v2/user/delegations" type="endpoint">
-  Current active delegations for a user. Pass `?user=0x...`.
-</ParamField>
+Vault equity positions for a specific user (what vaults they're invested in). Pass `?user=0x...`.
 
-Real response for a user with no delegations:
+**Use case:** user profile pages showing vault holdings alongside spot and perp positions.
 
-```json
-[]
-```
+---
 
-## TWAP summaries
+## Delegations and staking
 
-<ParamField path="GET /v2/user/twap-summaries" type="endpoint">
-  Aggregated TWAP order status for a user — pending, executed, and canceled TWAPs. Pass `?user=0x...`.
-</ParamField>
+### `GET /v2/user/delegations`
 
-<ParamField path="GET /v2/user/twap-fills" type="endpoint">
-  Individual slice fills for each of a user's TWAP orders. Pass `?user=0x...`.
-</ParamField>
+Current active delegations for a user. Pass `?user=0x...`.
+
+**Use case:** staking dashboards showing a user's active stake.
+
+### `GET /v2/user/delegator-history`
+
+Historical delegate, undelegate, and withdrawal events for a user. Pass `?user=0x...`.
+
+**Use case:** staking history timelines, audit trails.
+
+### `GET /v2/user/delegator-rewards`
+
+Historical and unclaimed staking rewards for a user. Pass `?user=0x...`.
+
+**Use case:** rewards dashboards, tax reporting.
+
+---
+
+## TWAP orders
+
+### `GET /v2/user/twap-summaries`
+
+Aggregated TWAP order status for a user — pending, executed, and canceled TWAPs with totals. Pass `?user=0x...`.
+
+**Use case:** displaying a user's active TWAP orders on a trading dashboard.
+
+### `GET /v2/user/twap-fills`
+
+Individual slice fills for each of a user's TWAP orders. Pass `?user=0x...`.
+
+**Use case:** showing the execution timeline of a specific TWAP order.
+
+---
 
 ## Validator state
 
-<ParamField path="GET /v2/validator/l1-votes" type="endpoint">
-  Current L1 governance votes from active validators. Returns an array of vote records.
-</ParamField>
+### `GET /v2/validator/l1-votes`
+
+Current L1 governance votes from active validators. Returns an array of vote records (validator address, proposal, vote).
+
+**Use case:** governance dashboards, tracking what the validator set is voting on.
 
 ```bash
 curl -H "x-api-key: YOUR_KEY" https://hyper.polynode.dev/v2/validator/l1-votes
 ```
 
-Real response (no active votes right now):
+Example response when no active votes:
 
 ```json
 []
 ```
 
+---
+
 ## Spot deployment
 
-<ParamField path="GET /v2/spot-deploy-state" type="endpoint">
-  Current spot token deployment state for a deployer. Returns the deployer's active deployments plus the current gas auction parameters. Pass `?user=0x...` (any address, returns global auction state even if the user isn't deploying).
-</ParamField>
+### `GET /v2/spot-deploy-state`
 
-Real response:
+Current spot token deployment state for a deployer, plus the global gas auction parameters. Pass `?user=0x...` (any address works — the gas auction state is returned regardless of whether that user is deploying).
+
+```bash
+curl -H "x-api-key: YOUR_KEY" \
+  "https://hyper.polynode.dev/v2/spot-deploy-state?user=0xacd89cFCB82Ae1f843467D56b58796bb928C9E1A"
+```
+
+Example response:
 
 ```json
 {
@@ -91,10 +116,10 @@ Real response:
 }
 ```
 
-The `gasAuction` object describes HyperLiquid's Dutch auction for spot pair deployment — gas price decays linearly from `startGas` over `durationSeconds`. See [Gas Auctions research](/research/gas-auctions) for the full mechanism.
+**Use case:** monitoring the spot deployment gas auction (Dutch auction — price decays linearly over `durationSeconds`). See [Gas Auctions research](/research/gas-auctions) for the full mechanism.
 
-## Why query these through hypernode
+---
 
-- **Zero external rate limits.** We serve from our local HL non-validator node. You're not sharing a throttled public endpoint with anyone.
-- **Sub-20ms latency** for most of these queries (the local node is on the same machine as the API).
-- **One API key** works across every endpoint in this list, the snapshot endpoints, the batch queries, and the WebSocket stream.
+## Why these endpoints
+
+These are standard HyperLiquid info API queries exposed through your hypernode API key. You get them on the same key that serves the WebSocket stream, exchange API, and batch queries — no second integration, no separate rate limit bucket, one bill.

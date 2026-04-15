@@ -4,65 +4,63 @@ sidebarTitle: Perp Snapshot
 description: Full positioning of every active trader on HyperLiquid in one call
 ---
 
-The perp snapshot endpoint returns the current clearinghouse state (positions, margin, account value, funding, liquidation price) for **every active trader on HyperLiquid** in a single response. The snapshot is rebuilt in the background every 2-3 seconds and served from a pre-compressed, in-memory cache.
+Returns the current clearinghouse state — positions, margin, account value, funding, and liquidation price — for every active trader on HyperLiquid in a single response. Refreshed every 2-3 seconds.
 
-<Note>
-Current production snapshot covers **28,828 active traders** (measured live). Refreshed every ~2.5 seconds. Served at ~56ms TTFB from a zero-copy `Arc<Bytes>` cache. Full payload is 34 MB uncompressed, **~6.4 MB gzipped** (5.4× compression).
-</Note>
+## When to use this
+
+Reach for the snapshot endpoints when you need a point-in-time view of **every active wallet** on HyperLiquid at once:
+
+- **Copy trading platforms** watching thousands of leader wallets simultaneously
+- **Whale tracking dashboards** scanning for large positions or sudden changes
+- **Leaderboards** ranking traders by account value or PnL
+- **Portfolio analytics** computing aggregate leverage, open interest, or concentration across the whole market
+- **Risk monitors** watching the liquidation landscape across all users
+
+If you only need one wallet at a time, use [`/v2/user/state`](/rest/user-data/user) instead. If you need hundreds or thousands of specific wallets, use [`/v2/batch/clearinghouse-states`](/rest/user-data/batch-queries). Snapshot endpoints are the right call when you want **everyone**.
 
 ## Endpoints
 
 | Endpoint | Purpose |
 |----------|---------|
-| `GET /v2/perp-snapshot/metadata` | Lightweight 110-byte metadata — poll cheaply, fetch full only when fresh |
+| `GET /v2/perp-snapshot/metadata` | Tiny metadata — poll cheaply, fetch full only when fresh |
 | `GET /v2/perp-snapshot` | Full snapshot of every active trader's clearinghouse state |
 | `GET /v2/spot-snapshot/metadata` | Metadata for spot snapshot |
 | `GET /v2/spot-snapshot` | Spot balances for every user with non-empty spot holdings |
 | `GET /v2/account-value-snapshot/metadata` | Metadata for account value snapshot |
-| `GET /v2/account-value-snapshot` | Projected `accountValue` + `withdrawable` only (small, fast) |
+| `GET /v2/account-value-snapshot` | accountValue and withdrawable only — small and fast |
 
-## Metadata-first polling pattern
+## Authentication
 
-Polling the full snapshot is expensive (34 MB). Instead, poll the metadata endpoint first — it's 110 bytes and returns instantly. Only fetch the full snapshot when `snapshotTimestamp` changes.
+All endpoints require an API key via the `x-api-key` header (or `?key=` query param).
+
+## Metadata-first polling
+
+The full snapshot is 34 MB. Polling it at high frequency burns bandwidth. Always poll the metadata endpoint first — it returns in under 20ms — and only fetch the full response when `snapshotTimestamp` changes.
 
 ```bash
 curl -H "x-api-key: YOUR_KEY" \
   https://hyper.polynode.dev/v2/perp-snapshot/metadata
 ```
 
-Real response (captured from live production):
+Response:
 
 ```json
 {
-  "queryMs": 4224,
-  "sizeBytes": 34785713,
   "snapshotTimestamp": 1776229734159,
+  "userCount": 28828,
   "totalQueried": 28828,
-  "userCount": 28828
+  "queryMs": 4224,
+  "sizeBytes": 34785713
 }
 ```
 
-Fields:
-
-<ResponseField name="snapshotTimestamp" type="integer">
-  Unix millis when this snapshot was generated. Compare against your last-fetched value — if unchanged, the cached response hasn't been updated, so you can skip fetching the full payload.
-</ResponseField>
-
-<ResponseField name="userCount" type="integer">
-  Number of traders with non-null clearinghouse state in this snapshot.
-</ResponseField>
-
-<ResponseField name="totalQueried" type="integer">
-  Number of active addresses we queried (sourced from the live L4 order book).
-</ResponseField>
-
-<ResponseField name="queryMs" type="integer">
-  Milliseconds it took the background generator to rebuild the snapshot.
-</ResponseField>
-
-<ResponseField name="sizeBytes" type="integer">
-  Full response size in bytes.
-</ResponseField>
+| Field | Description |
+|-------|-------------|
+| `snapshotTimestamp` | Unix milliseconds when this snapshot was produced. Changes each refresh. |
+| `userCount` | Number of wallets in the snapshot with non-null state. |
+| `totalQueried` | Total active wallets considered for this snapshot. |
+| `queryMs` | How long the snapshot took to produce. Informational. |
+| `sizeBytes` | Full response size before compression. |
 
 ## Full perp snapshot
 
@@ -71,15 +69,14 @@ curl --compressed -H "x-api-key: YOUR_KEY" \
   https://hyper.polynode.dev/v2/perp-snapshot
 ```
 
-Always pass `--compressed` (or `Accept-Encoding: gzip`) — the server supports gzip and zstd and the payload shrinks from 34 MB to ~6.4 MB on the wire.
+Always pass `--compressed` (or `Accept-Encoding: gzip`). The payload shrinks from 34 MB to roughly 6.4 MB on the wire.
 
-Real response (truncated to one user):
+Example response (truncated to one wallet — the real response contains ~28,000):
 
 ```json
 {
   "snapshotTimestamp": 1776229734159,
   "userCount": 28828,
-  "queryMs": 4224,
   "positions": {
     "0x000000000005dfe874f01071d0e05f99178a5cfc": {
       "marginSummary": {
@@ -88,13 +85,6 @@ Real response (truncated to one user):
         "totalRawUsd": "-2068.282759",
         "totalMarginUsed": "525.178050"
       },
-      "crossMarginSummary": {
-        "accountValue": "557.607491",
-        "totalNtlPos": "2625.890250",
-        "totalRawUsd": "-2068.282759",
-        "totalMarginUsed": "525.178050"
-      },
-      "crossMaintenanceMarginUsed": "65.647256",
       "withdrawable": "32.235491",
       "assetPositions": [
         {
@@ -105,16 +95,9 @@ Real response (truncated to one user):
             "entryPx": "17.505",
             "positionValue": "2625.89025",
             "unrealizedPnl": "-0.107491",
-            "returnOnEquity": "-0.000204",
             "leverage": {"type": "cross", "value": 5},
             "liquidationPx": "20.8891",
-            "marginUsed": "525.17805",
-            "maxLeverage": 10,
-            "cumFunding": {
-              "allTime": "-12.345",
-              "sinceOpen": "-0.891",
-              "sinceChange": "-0.891"
-            }
+            "marginUsed": "525.17805"
           }
         }
       ],
@@ -124,13 +107,11 @@ Real response (truncated to one user):
 }
 ```
 
-The `positions` object is keyed by wallet address (lowercase). Every value is the full clearinghouseState response you'd get from querying a single user.
+The `positions` object is keyed by wallet address. Each value has the same shape as the `clearinghouseState` response you'd get from HyperLiquid's info API for a single user — drop-in compatible with existing code.
 
 ## Account value snapshot
 
-If you only need `accountValue` and `withdrawable` per user (for leaderboards, TVL calculations, or quick filters), use `/v2/account-value-snapshot` instead. It's a **12× smaller payload** because it strips positions.
-
-Real response:
+Only need `accountValue` and `withdrawable` per user? Use `/v2/account-value-snapshot` — it's 12x smaller because it strips positions.
 
 ```json
 {
@@ -145,7 +126,7 @@ Real response:
 }
 ```
 
-Full payload is **~2.8 MB uncompressed, ~600 KB gzipped**. Served in ~54ms total.
+Perfect for leaderboards and TVL calculations where you don't care about per-position detail.
 
 ## Spot snapshot
 
@@ -155,7 +136,6 @@ Full payload is **~2.8 MB uncompressed, ~600 KB gzipped**. Served in ~54ms total
 {
   "snapshotTimestamp": 1776229734105,
   "userCount": 27315,
-  "queryMs": 2999,
   "balances": {
     "0x000000000005dfe874f01071d0e05f99178a5cfc": {
       "balances": [
@@ -163,11 +143,7 @@ Full payload is **~2.8 MB uncompressed, ~600 KB gzipped**. Served in ~54ms total
           "coin": "USDC",
           "token": 0,
           "total": "30529.26968461",
-          "hold": "313.85604084",
-          "spotHold": "532.93030183",
-          "supplied": "29964.10388662",
-          "entryNtl": "0.0",
-          "ltv": "0.0"
+          "hold": "313.85604084"
         }
       ]
     }
@@ -177,61 +153,47 @@ Full payload is **~2.8 MB uncompressed, ~600 KB gzipped**. Served in ~54ms total
 
 ## Performance
 
-| Endpoint | Uncompressed | Gzipped | TTFB | Total (local) |
-|----------|-------------|---------|------|---------------|
-| `/perp-snapshot/metadata` | 110 B | 110 B | ~20ms | ~220ms |
-| `/perp-snapshot` | 34.8 MB | 6.4 MB | 56ms | 360ms |
-| `/account-value-snapshot` | 2.8 MB | 600 KB | ~10ms | 54ms |
-| `/spot-snapshot` | 14.3 MB | ~3 MB | ~30ms | ~150ms |
+Measured on production with a representative snapshot:
 
-The server handler itself is always under 60ms because it just returns a pre-serialized `Arc<Bytes>` from memory. The rest of the total time is network transfer. Always use compression.
+| Endpoint | Uncompressed | Gzipped | Typical response time |
+|----------|-------------|---------|------------------------|
+| perp-snapshot/metadata | 110 B | 110 B | ~220ms |
+| perp-snapshot | 34.8 MB | 6.4 MB | ~360ms |
+| account-value-snapshot | 2.8 MB | 600 KB | ~54ms |
+| spot-snapshot | 14.3 MB | ~3 MB | ~150ms |
 
-## Polling strategy
+Always use compression. The server supports gzip and zstd.
 
-For active copy trading or whale monitoring:
+## Polling example
 
 ```python
-import asyncio, aiohttp, json
+import asyncio, aiohttp
 
-async def watch(session, api_key):
+async def watch(api_key):
     headers = {"x-api-key": api_key, "Accept-Encoding": "gzip"}
     last_ts = 0
 
-    while True:
-        async with session.get(
-            "https://hyper.polynode.dev/v2/perp-snapshot/metadata",
-            headers=headers
-        ) as r:
-            meta = await r.json()
-
-        if meta["snapshotTimestamp"] != last_ts:
+    async with aiohttp.ClientSession() as session:
+        while True:
             async with session.get(
-                "https://hyper.polynode.dev/v2/perp-snapshot",
+                "https://hyper.polynode.dev/v2/perp-snapshot/metadata",
                 headers=headers
             ) as r:
-                snap = await r.json()
-            last_ts = snap["snapshotTimestamp"]
-            print(f"Fresh snapshot: {snap['userCount']} users at ts {last_ts}")
-            # Process snap["positions"] here
+                meta = await r.json()
 
-        await asyncio.sleep(1)
+            if meta["snapshotTimestamp"] != last_ts:
+                async with session.get(
+                    "https://hyper.polynode.dev/v2/perp-snapshot",
+                    headers=headers
+                ) as r:
+                    snap = await r.json()
+                last_ts = snap["snapshotTimestamp"]
+                print(f"Fresh snapshot: {snap['userCount']} users")
+                # Process snap["positions"] here
 
-async def main():
-    async with aiohttp.ClientSession() as session:
-        await watch(session, "pn_live_...")
+            await asyncio.sleep(1)
 
-asyncio.run(main())
+asyncio.run(watch("pn_live_..."))
 ```
 
-Metadata polls are effectively free (110 bytes), so you can poll at 1 Hz and only fetch the full snapshot when it actually updates (~every 2.5s).
-
-## How it works internally
-
-The snapshot generator runs as a background task inside `hl-l4-api`:
-
-1. **Active address discovery**: every time the L4 order book refreshes (once per second), we extract every unique user address that has a resting order. This gives us a rolling set of currently-active traders.
-2. **Batch query**: the generator fires up to 400 concurrent `clearinghouseState` queries against our local HL node (semaphore-limited to prevent overload).
-3. **Pre-serialization**: the full response is serialized to JSON once, wrapped in `Arc<Bytes>`, and stored in an `ArcSwap` cell.
-4. **Zero-copy serving**: every user request just returns a clone of the `Arc<Bytes>` pointer — no serialization, no I/O, no locking.
-
-The whole cycle takes 2-4 seconds and runs continuously. Snapshot freshness is typically **2-3 seconds**.
+Poll metadata at 1 Hz (essentially free) and only fetch the full snapshot when it updates.

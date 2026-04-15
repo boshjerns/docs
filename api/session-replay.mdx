@@ -1,18 +1,26 @@
 ---
 title: Session Replay
 sidebarTitle: Session Replay
-description: Reconnect to the WebSocket stream and replay missed events with zero gaps using a session_id and sequence cursor
+description: Reconnect to the WebSocket stream and replay missed events with zero gaps
 ---
 
 When a WebSocket connection drops, you typically lose every event that happened while you were disconnected. hypernode solves this with **session replay**: pass a `session_id` and `since_seq` cursor on reconnect, and the server replays every missed event that matches your subscription filter before resuming the live stream.
 
-<Note>
-Every event on the hypernode WebSocket stream is stamped with a monotonic `seq` field. Track the latest seq you've processed, and on reconnect you'll get exactly what you missed — no duplicates, no gaps.
-</Note>
+## When to use this
 
-## Every event has a `seq` field
+- **Production trading systems** where gaps in the event stream can cause desync between your local state and the real chain state
+- **Fill monitors** that track PnL and positions by watching `fill` events
+- **Builder analytics** tracking every fill attributed to your builder address
+- **Compliance and audit** pipelines that need to prove they received every event in a window
+- **Any client that cares about reliability** — brief network blips, client crashes, container restarts, load balancer reconnects
 
-Every event now carries a `seq` number alongside the existing fields. This is a global monotonic counter — the server increments it for every event it broadcasts.
+If you don't care about gaps (sampling use cases, dashboards that refresh periodically), you don't need session replay. It's optional. Clients that don't pass `session_id` work exactly as before.
+
+## How it works for the client
+
+Every event on the WebSocket stream now carries a `seq` field. It's a monotonically increasing integer — each event gets a unique seq one higher than the last. Track the highest `seq` you've processed, and on reconnect you'll get exactly what you missed.
+
+Example event with seq:
 
 ```json
 {
@@ -31,18 +39,11 @@ Every event now carries a `seq` number alongside the existing fields. This is a 
     "closedPnl": "1.70538",
     "fee": "0.784813",
     "oid": 382009563898,
-    "tid": 1094600066756112,
-    "builder": null,
-    "builderFee": null,
-    "liquidation": null
+    "tid": 1094600066756112
   },
-  "network": "mainnet",
-  "block": 0,
-  "asset_id": 0
+  "network": "mainnet"
 }
 ```
-
-Store the last `seq` you processed. On reconnect, pass it back as `since_seq` and the server will replay everything newer.
 
 ## Reconnect flow
 
@@ -52,16 +53,15 @@ Pass `session_id` and `since_seq` as query params when reconnecting:
 wss://hyper.polynode.dev/ws?key=YOUR_KEY&session_id=<uuid>&since_seq=<last_seq>
 ```
 
-After sending your `subscribe` message, the server responds with:
+After you send your `subscribe` message, the server responds with:
 
-1. A normal `subscribed` ack (same as any subscription)
+1. A normal `subscribed` ack
 2. A `reconnected` notification listing how many events will be replayed
-3. The replayed events themselves (ordered by seq, matching your filter)
-4. Optional `replay_chunk` progress notifications for large replays
-5. A final `replay_complete` message
-6. Live events resume
+3. The replayed events themselves (ordered by seq, already filtered)
+4. A `replay_complete` message
+5. Live events resume
 
-### Example ack
+### Subscribed ack
 
 ```json
 {
@@ -74,7 +74,7 @@ After sending your `subscribe` message, the server responds with:
 }
 ```
 
-### `reconnected` notification
+### Reconnected notification
 
 ```json
 {
@@ -87,7 +87,7 @@ After sending your `subscribe` message, the server responds with:
 }
 ```
 
-### `replay_complete` notification
+### Replay complete
 
 ```json
 {
@@ -100,7 +100,7 @@ After sending your `subscribe` message, the server responds with:
 
 ## Retention window
 
-The server keeps the last **30 seconds** of events (up to 500,000 events) in an in-memory ring buffer. If you reconnect within 30 seconds of disconnecting, every missed event that matches your filter will be replayed. If you wait longer than 30 seconds and your cursor falls outside the buffer, you'll receive a `gap` signal instead.
+hypernode keeps up to **30 seconds** of recent events available for replay. If you reconnect within that window, every missed event that matches your subscription filter is delivered before live events resume. If your cursor is older than the window, you'll receive a gap signal instead.
 
 ### Gap signal
 
@@ -115,15 +115,14 @@ The server keeps the last **30 seconds** of events (up to 500,000 events) in an 
 }
 ```
 
-When you see `gap: true`, your cursor was older than the oldest event we still have. You need to reload any snapshot state (positions, orderbook, etc.) from REST endpoints and start fresh. This is rare in production — most clients reconnect within a few seconds.
+When you see `gap: true`, your cursor was older than the oldest replayable event. Reload any snapshot state you were maintaining (positions, order book, etc.) from REST and start fresh. In practice this rarely happens — most clients reconnect within a few seconds.
 
-## Full Python example
+## Full Python client
+
+A reconnect-safe client that tracks the last seq and resumes automatically:
 
 ```python
-import asyncio
-import json
-import uuid
-import websockets
+import asyncio, json, uuid, websockets
 
 API_KEY = "pn_live_..."
 SESSION = str(uuid.uuid4())
@@ -144,17 +143,17 @@ async def stream(last_seq=0):
             action = event.get("action")
 
             if action == "subscribed":
-                print(f"Subscribed, server has newest_seq={event.get('newest_seq')}")
+                print(f"Subscribed, newest_seq={event.get('newest_seq')}")
                 continue
             if action == "reconnected":
                 if event.get("gap"):
-                    print(f"GAP: need to reload state")
-                    # Reload from REST here
+                    print("Gap detected — reload snapshot state")
+                    # Reload positions, orderbook, etc. from REST here
                 else:
                     print(f"Replaying {event['total_events']} missed events")
                 continue
             if action == "replay_complete":
-                print(f"Replay done, resuming live at seq {event['resume_seq']}")
+                print(f"Replay done, live at seq {event['resume_seq']}")
                 continue
 
             # Normal event
@@ -178,20 +177,14 @@ async def main():
 asyncio.run(main())
 ```
 
-This client tracks the last seq it processed, and when the connection drops (for any reason — network blip, server restart, etc.), it reconnects with the cursor and receives exactly the events it missed.
-
-## When to use session replay
-
-- **Always** for production trading systems, fill monitors, and any client where gaps matter
-- **Trader state reconstruction**: keep a rolling view of positions by watching `fill` events; reconnect with replay to avoid desync
-- **Builder analytics**: track every fill attributed to your builder address without worrying about brief network blips
-- **Compliance / audit trails**: prove you received every event in a time window
+This client tracks the last seq it processed, and whenever the connection drops — for any reason — it reconnects with the cursor and receives exactly the events it missed.
 
 ## Limits
 
-- Buffer retention: **30 seconds**
-- Max events per buffer: **500,000**
-- Max events per replay chunk: **500**
-- Max total replay per reconnect: **10,000 events**
+| Limit | Value |
+|-------|-------|
+| Retention window | 30 seconds |
+| Max events per replay | 10,000 |
+| Max events per chunk | 500 |
 
-If you need longer retention or higher replay caps, reach out — we can tune these per customer.
+If you need longer retention or higher replay caps, reach out and we can tune these.

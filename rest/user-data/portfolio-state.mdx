@@ -1,23 +1,35 @@
 ---
 title: Portfolio State
 sidebarTitle: Portfolio State
-description: Bundle perp positions, spot balances, open orders, and account abstraction mode into a single call
+description: Bundle perp positions, spot balances, open orders, and account abstraction into one call
 ---
 
-`/v2/user/portfolio-state` returns everything you need to display a trader's full account state in one request. Instead of making 4 separate calls to `clearinghouseState`, `spotClearinghouseState`, `openOrders`, and `userAbstraction`, the server fans them out in parallel against the local HL node and returns the merged response.
+`/v2/user/portfolio-state` returns everything you need to display a trader's full account state in a single response: perp positions, spot balances, open orders, and account abstraction mode.
 
-<Note>
-Response time: **20-30ms total** (4 parallel local node calls). Saves you 3 round-trips vs making each call individually.
-</Note>
+## When to use this
 
-## Single-user endpoint
+- **User profile pages** in a trading dashboard — show perp PnL, spot holdings, and open orders without chaining multiple calls
+- **Copy trading dashboards** fetching the complete state of every leader you track
+- **Login flows** that need to populate a user's full account in one request
+- **Risk monitors** pulling a complete picture of an account in a single round-trip
+
+Instead of making 4 separate requests to `clearinghouseState`, `spotClearinghouseState`, `openOrders`, and `userAbstraction`, you make one.
+
+## Single user
 
 ```bash
 curl -H "x-api-key: YOUR_KEY" \
   "https://hyper.polynode.dev/v2/user/portfolio-state?user=0x711d5ee8df7f0075f5393f7c9197248e961542b1"
 ```
 
-Real response (captured from production):
+### Query parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `user` (or `address`) | string | yes | Wallet address (checksum or lowercase) |
+| `key` | string | no | API key. Can also be passed via `x-api-key` header. |
+
+### Example response
 
 ```json
 {
@@ -39,17 +51,17 @@ Real response (captured from production):
       {
         "position": {
           "coin": "BTC",
-          "cumFunding": {
-            "allTime": "-0.080775",
-            "sinceChange": "-0.119844",
-            "sinceOpen": "-0.079252"
-          },
           "entryPx": "69111.0",
           "leverage": {"type": "cross", "value": 5},
           "liquidationPx": "88027.2944556678",
           "marginUsed": "40.81055",
           "maxLeverage": 40,
-          "positionValue": "204.05275"
+          "positionValue": "204.05275",
+          "cumFunding": {
+            "allTime": "-0.080775",
+            "sinceChange": "-0.119844",
+            "sinceOpen": "-0.079252"
+          }
         }
       }
     ],
@@ -65,29 +77,20 @@ Real response (captured from production):
 }
 ```
 
-Response shape:
+### Response fields
 
-<ParamField body="perp" type="object">
-  Full clearinghouse state (perp positions, margin summary, cross margin summary, withdrawable, asset positions with funding and liquidation prices).
-</ParamField>
+| Field | Type | Description |
+|-------|------|-------------|
+| `perp` | object | Full clearinghouse state — positions, margin summary, withdrawable. Same shape as HyperLiquid's `clearinghouseState`. |
+| `spot` | object | Spot token balances. Same shape as `spotClearinghouseState`. |
+| `openOrders` | array | All open resting orders across perp and spot. Same shape as `openOrders`. |
+| `abstraction` | string | Account abstraction mode. `"default"` for standard accounts. |
 
-<ParamField body="spot" type="object">
-  Spot balances — all tokens the user holds in their spot account.
-</ParamField>
+Any sub-field may be `null` if that part of the user's state is empty or the underlying query failed.
 
-<ParamField body="openOrders" type="array">
-  Open resting orders across perp and spot markets. Each order includes `coin`, `limitPx`, `oid`, `side`, `sz`, `origSz`, `reduceOnly`, `timestamp`, and `triggerCondition` if applicable.
-</ParamField>
+## Batch — up to 2,500 wallets per request
 
-<ParamField body="abstraction" type="string">
-  Account abstraction mode — `"default"` or a custom abstraction identifier.
-</ParamField>
-
-Any field can be `null` if that sub-query returned empty or the underlying call failed.
-
-## Batch portfolio-states (up to 2,500 wallets)
-
-For copy-trading platforms, portfolio trackers, or multi-user dashboards, query up to **2,500 wallets** in a single POST:
+For copy trading platforms and multi-user dashboards, use the batch variant to pull many wallets at once.
 
 ```bash
 curl -X POST \
@@ -102,13 +105,23 @@ curl -X POST \
   https://hyper.polynode.dev/v2/batch/portfolio-states
 ```
 
-The response is keyed by wallet address. Each value has the same shape as the single-user endpoint:
+### Request body
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `users` | string[] | yes | Wallet addresses (max 2,500 per request) |
+| `key` | string | no | API key (optional if passed via header) |
+| `dry` | boolean | no | If true, return stub responses for capacity testing without live queries |
+
+### Response
+
+Keyed by wallet address. Each value has the same shape as the single-user endpoint.
 
 ```json
 {
   "0x711d5ee8df7f0075f5393f7c9197248e961542b1": {
-    "perp": { "...": "..." },
-    "spot": { "...": "..." },
+    "perp": {"...": "..."},
+    "spot": {"...": "..."},
     "openOrders": [],
     "abstraction": "default"
   },
@@ -123,17 +136,17 @@ The response is keyed by wallet address. Each value has the same shape as the si
 
 ### Dry-run mode
 
-Pass `"dry": true` in the request body to get a stub response without touching the local node. Useful for building/testing your parser.
+Pass `"dry": true` to get a response with the correct shape but stub values. Useful for building and testing your parser without generating real load.
 
 ```bash
 curl -X POST \
   -H "x-api-key: YOUR_KEY" \
   -H "Content-Type: application/json" \
-  -d '{"users":["0x711..."],"dry":true}' \
+  -d '{"users":["0x711d5ee8df7f0075f5393f7c9197248e961542b1"],"dry":true}' \
   https://hyper.polynode.dev/v2/batch/portfolio-states
 ```
 
-Real dry response:
+Dry response:
 
 ```json
 {
@@ -153,13 +166,9 @@ Real dry response:
 
 ### Limits
 
-- Single-user `/v2/user/portfolio-state`: no hard limit, rate-limited by tier
-- Batch `/v2/batch/portfolio-states`: max **2,500 wallets per request** (lower than the 10,000 cap on other batch endpoints because each wallet fans out to 4 sub-queries)
-- Concurrency: semaphore-limited to 100 concurrent portfolio-states, which means 400 concurrent underlying node queries
+| Limit | Value |
+|-------|-------|
+| Max wallets per request | 2,500 |
+| Body size cap | 2 MB |
 
-## Why this is useful
-
-- **Copy trading dashboards**: fetch the complete state of every wallet you track in one call
-- **Leaderboards**: pair with `/v2/account-value-snapshot` to identify top traders, then fetch their full portfolio-state
-- **Risk analytics**: pull the entire active set to compute aggregate leverage, open interest, or concentration metrics
-- **User profile pages**: show positions, spot holdings, open orders, and abstraction mode without chaining 4 REST calls
+If you need more than 2,500 at a time, use [`/v2/batch/clearinghouse-states`](/rest/user-data/batch-queries) which supports up to 10,000 (perp positions only, no spot or open orders).
