@@ -129,7 +129,8 @@
               "rest/user-data/user-delegations",
               "rest/user-data/user-abstraction",
               "rest/user-data/user-builder-fee",
-              "rest/user-data/user-multi-sig"
+              "rest/user-data/user-multi-sig",
+              "rest/user-data/batch-queries"
             ]
           },
           {

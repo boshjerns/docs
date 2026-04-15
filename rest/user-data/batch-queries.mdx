@@ -1,0 +1,124 @@
+---
+title: Batch User Queries
+sidebarTitle: Batch Queries
+description: Query position state, spot balances, or open orders for up to 10,000 wallets in a single request
+---
+
+Query position state for thousands of wallets in one call. Designed for copy trading platforms, portfolio trackers, whale monitoring, and any application that needs to watch many wallets at once.
+
+<Note>
+Native HyperLiquid info API only supports single-wallet queries. hypernode fans out to our local HL node with tuned concurrency control, returning results for up to 10,000 wallets per request in under 1.5 seconds.
+</Note>
+
+## Endpoints
+
+| Endpoint | What it returns |
+|----------|-----------------|
+| `POST /v2/batch/clearinghouse-states` | Perp positions, margin, account value |
+| `POST /v2/batch/spot-clearinghouse-states` | Spot token balances |
+| `POST /v2/batch/open-orders` | All open orders for each wallet |
+
+## Request
+
+```bash
+curl -X POST https://hyper.polynode.dev/v2/batch/clearinghouse-states \
+  -H "x-api-key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "users": [
+      "0xacd89cFCB82Ae1f843467D56b58796bb928C9E1A",
+      "0x711d5ee8df7f0075f5393f7c9197248e961542b1"
+    ]
+  }'
+```
+
+<ParamField body="users" type="string[]" required>
+  Array of wallet addresses. Maximum 10,000 per request.
+</ParamField>
+
+<ParamField body="dry" type="boolean" default="false">
+  If true, returns stub responses without querying the local node. Use for capacity testing and client benchmarking without adding load to production.
+</ParamField>
+
+## Response
+
+Returns an object keyed by wallet address. Each value is the full response that `clearinghouseState` would return for that wallet, or `null` if the wallet has no state.
+
+```json
+{
+  "0xacd89cFCB82Ae1f843467D56b58796bb928C9E1A": {
+    "marginSummary": {
+      "accountValue": "12543.21",
+      "totalNtlPos": "8921.45",
+      "totalRawUsd": "3621.76",
+      "totalMarginUsed": "892.15"
+    },
+    "crossMarginSummary": { ... },
+    "withdrawable": "3621.76",
+    "assetPositions": [
+      {
+        "type": "oneWay",
+        "position": {
+          "coin": "BTC",
+          "szi": "0.125",
+          "entryPx": "71234.5",
+          "unrealizedPnl": "43.21",
+          "liquidationPx": "45678.9"
+        }
+      }
+    ],
+    "time": 1776204147470
+  },
+  "0x711d5ee8df7f0075f5393f7c9197248e961542b1": {
+    ...
+  }
+}
+```
+
+## Performance
+
+Measured on the production endpoint with real wallet addresses:
+
+| Batch Size | Response Time | Per-Wallet |
+|------------|--------------|------------|
+| 100 wallets | ~40ms | 0.4ms |
+| 1,000 wallets | ~130ms | 0.13ms |
+| 5,000 wallets | ~600ms | 0.12ms |
+| 10,000 wallets | ~1,225ms | 0.12ms |
+
+Per-wallet latency scales linearly because requests fan out in parallel against the local HL node with tuned concurrency control. Response times remain stable under load.
+
+**Estimation formula:** `25ms + (wallet_count × 0.12ms)` gives a solid live-response estimate.
+
+## Dry-run mode
+
+Set `dry: true` in the request body to get stub responses without querying the local node. The response shape matches a real response, but all fields are zeroed and a `_dry: true` marker is included.
+
+```bash
+curl -X POST https://hyper.polynode.dev/v2/batch/clearinghouse-states \
+  -H "x-api-key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"users": ["0xacd89cFCB82Ae1f843467D56b58796bb928C9E1A"], "dry": true}'
+```
+
+Use dry-run for:
+- Client-side capacity testing (measure your pipeline, not ours)
+- Estimating response sizes at different batch counts
+- Integration testing without hitting rate limits
+- Benchmarking serialization/deserialization code
+
+## Use cases
+
+**Copy trading platforms** — Poll 1000+ leader wallets every few seconds to detect position changes in near-real-time.
+
+**Portfolio trackers** — Fetch positions for all users on login without chaining 100 individual requests.
+
+**Whale monitoring** — Watch a list of known whale addresses for new positions, liquidations, or exits.
+
+**Risk analytics** — Pull the entire active trader set and compute aggregate leverage, open interest, or concentration metrics.
+
+## Limits
+
+- Max 10,000 wallets per request
+- Max request body size: 2 MB (allows ~50,000 bytes per wallet address including overhead)
+- Standard tier rate limits apply to the endpoint itself (not per-wallet)
