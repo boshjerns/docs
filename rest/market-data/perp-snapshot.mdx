@@ -7,7 +7,7 @@ description: Full positioning of every active trader on HyperLiquid in one call
 The perp snapshot endpoint returns the current clearinghouse state (positions, margin, account value, funding, liquidation price) for **every active trader on HyperLiquid** in a single response. The snapshot is rebuilt in the background every 2-3 seconds and served from a pre-compressed, in-memory cache.
 
 <Note>
-Current production snapshot covers **28,828 active traders** (measured live). Refreshed every ~2.5 seconds. Served at ~56ms TTFB from a zero-copy Arc<Bytes> cache. Full payload is 34 MB uncompressed, **~6.4 MB gzipped** (5.4× compression).
+Current production snapshot covers **28,828 active traders** (measured live). Refreshed every ~2.5 seconds. Served at ~56ms TTFB from a zero-copy `Arc<Bytes>` cache. Full payload is 34 MB uncompressed, **~6.4 MB gzipped** (5.4× compression).
 </Note>
 
 ## Endpoints
@@ -184,7 +184,7 @@ Full payload is **~2.8 MB uncompressed, ~600 KB gzipped**. Served in ~54ms total
 | `/account-value-snapshot` | 2.8 MB | 600 KB | ~10ms | 54ms |
 | `/spot-snapshot` | 14.3 MB | ~3 MB | ~30ms | ~150ms |
 
-The server handler itself is always <60ms because it just returns a pre-serialized `Arc<Bytes>` from memory. The rest of the total time is network transfer. Always use compression.
+The server handler itself is always under 60ms because it just returns a pre-serialized `Arc<Bytes>` from memory. The rest of the total time is network transfer. Always use compression.
 
 ## Polling strategy
 
