@@ -13,7 +13,7 @@ By merging pre-consensus gossip data (cancel actions) with confirmed order flow 
 | Source | What it carries | Latency |
 |--------|----------------|---------|
 | Gossip protocol (pre-consensus) | Cancel and modify requests before block commit | ~1.6s ahead of confirmation |
-| Non-validator node (confirmed) | Every order status change: filled, canceled, rejected | Definitive, post-matching |
+| Confirmed event stream | Every order status change: filled, canceled, rejected | Definitive, post-matching |
 
 A cancel in gossip means a user *wants* to pull an order. A confirmed `order_canceled` means it succeeded. A confirmed `order_filled` on the same `oid` means it didn't — the order was taken before the cancel reached the validator.
 
@@ -118,7 +118,7 @@ ws.on("message", (raw) => {
 
 This signal requires both data layers merged in one stream:
 - **Gossip cancels** are not available through any public HyperLiquid API
-- **Confirmed fills with oids** come from the non-validator node
+- **Confirmed fills with oids** come from the confirmed event stream
 - The `oid` correlation between layers is only possible when both sources are tagged and delivered together
 
 No other HyperLiquid data provider combines pre-consensus gossip with confirmed order flow.
