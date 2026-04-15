@@ -109,7 +109,8 @@
               "rest/market-data/margin-table",
               "rest/market-data/exchange-status",
               "rest/market-data/max-market-orders",
-              "rest/market-data/oi-cap"
+              "rest/market-data/oi-cap",
+              "rest/market-data/perp-snapshot"
             ]
           },
           {
@@ -193,12 +194,6 @@
             "group": "Infrastructure",
             "pages": [
               "rest/evm-rpc"
-            ]
-          },
-          {
-            "group": "Snapshots",
-            "pages": [
-              "rest/snapshots/perp-snapshot"
             ]
           },
           {
