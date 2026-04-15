@@ -311,3 +311,146 @@ getPositions().then((positions) => {
   streamFills();
 });
 ```
+
+
+## Pattern: Watch for liquidations
+
+Stream every liquidation happening across HyperLiquid in real-time. Useful for liquidation bots, market stress monitors, and building a public liquidation feed.
+
+```typescript
+import WebSocket from "ws";
+
+const API_KEY = process.env.HYPERNODE_API_KEY;
+const ws = new WebSocket(`wss://hyper.polynode.dev/ws?key=${API_KEY}`);
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({
+    action: "subscribe",
+    filters: {
+      action_types: ["fill"],
+      liquidations_only: true
+    }
+  }));
+});
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  if (event.type !== "fill") return;
+
+  const { coin, sz, px, closedPnl } = event.data;
+  const { liquidatedUser, markPx, method } = event.data.liquidation;
+
+  console.log(
+    `LIQUIDATION: ${coin} sz=${sz} markPx=${markPx} ` +
+    `user=${liquidatedUser} pnl=${closedPnl} method=${method}`
+  );
+});
+```
+
+Every liquidation generates at least 2 fill events — one for the liquidated user and one for the liquidator(s). Both carry the same `data.liquidation` object and share the same `tid` and `hash` so you can correlate them.
+
+---
+
+## Pattern: Builder DEX attribution feed
+
+If you operate a HIP-3 builder DEX, subscribe to fills attributed to your builder address to track your flow in real-time without polling `userFills` per wallet.
+
+```typescript
+import WebSocket from "ws";
+
+const API_KEY = process.env.HYPERNODE_API_KEY;
+const BUILDER = "0x1924b8561eef20e70ede628a296175d358be80e5";
+const ws = new WebSocket(`wss://hyper.polynode.dev/ws?key=${API_KEY}`);
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({
+    action: "subscribe",
+    filters: {
+      action_types: ["fill"],
+      builders: [BUILDER]
+    }
+  }));
+});
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  if (event.type !== "fill") return;
+
+  const { coin, sz, px, builderFee } = event.data;
+  console.log(`Fill via our builder: ${coin} ${sz}@${px} fee=${builderFee}`);
+});
+```
+
+You can pass multiple builder addresses if you operate several DEXes.
+
+---
+
+## Pattern: All fills firehose for market analytics
+
+Subscribe to every fill on every market. Useful for VWAP calculations, open interest tracking, and market-wide analytics.
+
+```typescript
+const ws = new WebSocket(`wss://hyper.polynode.dev/ws?key=${API_KEY}`);
+
+ws.on("open", () => {
+  ws.send(JSON.stringify({
+    action: "subscribe",
+    filters: { action_types: ["fill"] }
+  }));
+});
+
+const volumeByAsset: Record<string, number> = {};
+
+ws.on("message", (raw) => {
+  const event = JSON.parse(raw.toString());
+  if (event.type !== "fill") return;
+
+  const coin = event.data.coin;
+  const notional = parseFloat(event.data.sz) * parseFloat(event.data.px);
+  volumeByAsset[coin] = (volumeByAsset[coin] || 0) + notional;
+});
+
+// Log top 5 by volume every 10 seconds
+setInterval(() => {
+  const top = Object.entries(volumeByAsset)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5);
+  console.log("Top 5 by volume:", top);
+}, 10000);
+```
+
+---
+
+## Pattern: Batch portfolio query for multi-wallet platforms
+
+Fetch portfolio performance for thousands of wallets in a single request. Designed for copy trading leaderboards, portfolio trackers, and multi-user dashboards.
+
+```typescript
+async function batchPortfolios(wallets: string[]) {
+  const res = await fetch("https://hyper.polynode.dev/v2/batch/portfolios", {
+    method: "POST",
+    headers: {
+      "x-api-key": process.env.HYPERNODE_API_KEY!,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ users: wallets }),
+  });
+  return await res.json();
+}
+
+// Up to 10,000 wallets per call
+const wallets = [
+  "0xacd89cFCB82Ae1f843467D56b58796bb928C9E1A",
+  "0x711d5ee8df7f0075f5393f7c9197248e961542b1",
+  // ... up to 10000 more
+];
+
+const portfolios = await batchPortfolios(wallets);
+for (const [address, data] of Object.entries(portfolios)) {
+  if (data) {
+    console.log(address, "portfolio:", data);
+  }
+}
+```
+
+Paired with `/v2/batch/clearinghouse-states` you can build a complete leaderboard snapshot of thousands of traders in well under a second.

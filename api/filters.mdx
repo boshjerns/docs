@@ -13,6 +13,8 @@ Filters narrow the event stream to only matching events. All filter dimensions u
 | `addresses` | `string[]` | Match on event `user` | Case-insensitive |
 | `assets` | `string[]` | Match on event `asset` | Case-insensitive |
 | `asset_ids` | `number[]` | Match on event `asset_id` | Exact numeric |
+| `builders` | `string[]` | Match on fill `data.builder` (HIP-3 builder address) | Case-insensitive |
+| `liquidations_only` | `boolean` | Match fills where `data.liquidation` is present | N/A |
 
 ## Behavior
 
@@ -74,3 +76,40 @@ These arrive before the cancel is committed to a block.
 {"action": "subscribe", "filters": {"assets": ["#39890"]}}
 ```
 Track a specific outcome token. Use the `#` coin name format.
+
+**All fills across every market (allFills firehose):**
+```json
+{"action": "subscribe", "filters": {"action_types": ["fill"]}}
+```
+Every trade execution network-wide. Useful for analytics, VWAP calculations, and market-wide tracking.
+
+**Liquidations only:**
+```json
+{"action": "subscribe", "filters": {"action_types": ["fill"], "liquidations_only": true}}
+```
+Only fills that were part of a liquidation event. Each matching fill carries a `data.liquidation` object with `liquidatedUser`, `markPx`, and `method`. Both sides of the liquidation (liquidated user and liquidator) appear as separate fills with the same `tid`.
+
+**Fills for a specific builder (HIP-3):**
+```json
+{
+  "action": "subscribe",
+  "filters": {
+    "action_types": ["fill"],
+    "builders": ["0x1924b8561eef20e70ede628a296175d358be80e5"]
+  }
+}
+```
+Only fills attributed to the given builder address via HIP-3. Useful for builder DEX operators tracking their own flow in real-time.
+
+**Monitor liquidations for a specific wallet:**
+```json
+{
+  "action": "subscribe",
+  "filters": {
+    "action_types": ["fill"],
+    "addresses": ["0xabc..."],
+    "liquidations_only": true
+  }
+}
+```
+Alert-style feed for when a specific wallet is liquidated.

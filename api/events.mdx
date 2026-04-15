@@ -143,6 +143,51 @@ These arrive before the validator commits them to a block:
 }
 ```
 
+## Liquidation fill example
+
+Liquidation fills carry a `data.liquidation` object in addition to the standard fill fields. Use the `liquidations_only` filter to subscribe to only these events.
+
+```json
+{
+  "block": 0,
+  "timestamp": 1776147612530,
+  "type": "fill",
+  "consensus": "confirmed",
+  "user": "0xf27f22d0988f958837c4393284297377a00387ed",
+  "asset": "SUI",
+  "data": {
+    "coin": "SUI",
+    "side": "A",
+    "px": "88.588",
+    "sz": "142.0",
+    "dir": "Close Long",
+    "closedPnl": "-123.45",
+    "fee": "0.0012",
+    "feeToken": "USDC",
+    "oid": 381234567890,
+    "tid": 912345678,
+    "hash": "0x3a4b5c...",
+    "crossed": true,
+    "liquidation": {
+      "liquidatedUser": "0xf27f22d0988f958837c4393284297377a00387ed",
+      "markPx": "88.588",
+      "method": "market"
+    }
+  },
+  "network": "mainnet"
+}
+```
+
+Both sides of a liquidation (the liquidated user and the liquidator) appear as separate fill events with the same `tid` and `hash`. Correlate them using these shared fields to see the full liquidation flow.
+
+**Liquidation object fields:**
+
+| Field | Description |
+|-------|-------------|
+| `liquidatedUser` | Address of the account being liquidated |
+| `markPx` | Mark price at the moment of liquidation |
+| `method` | Liquidation method (currently `"market"` for all observed liquidations) |
+
 ## Pre-consensus cancel example
 
 ```json
