@@ -9,7 +9,7 @@ hypernode is the only HyperLiquid API that merges two consensus layers into one 
 
 | | Pre-consensus | Confirmed |
 |---|---|---|
-| **Source** | Gossip protocol (before validators process) | Non-validator node (after block commit) |
+| **Source** | Gossip protocol (before validators process) | Confirmed (after block commit) |
 | **Timing** | ~1-2 seconds ahead of public API | ~0.5 seconds behind live |
 | **What you see** | Cancels, modifications, TWAP orders | All orders, fills, cancellations, rejections |
 | **Completeness** | Partial (no order placements, no fills) | 100% of all trading activity |

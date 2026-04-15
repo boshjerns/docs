@@ -13,7 +13,7 @@ description: Full depth order book with individual orders and wallet addresses
 | Level | What you see | Source |
 |-------|-------------|--------|
 | **L2** (public API) | Top 20 price levels, aggregated sizes, no addresses | `api.hyperliquid.xyz` |
-| **L4** (hypernode) | Every individual order: price, size, wallet address, order ID, timestamp | Our non-validator node |
+| **L4** (hypernode) | Every individual order: price, size, wallet address, order ID, timestamp | hypernode |
 
 ## Why it matters
 
@@ -31,7 +31,7 @@ On mainnet right now:
 - **380,000–400,000 individual orders** across all markets
 - **BTC alone: ~33,000 bids, ~15,000 asks (~48,000 total)**
 - **Refreshed every second** from our local node
-- **Pre-serialized** — responses are built in the background, served instantly
+- **Cached** — responses served instantly, no per-request computation
 
 ## Endpoints
 

@@ -39,7 +39,7 @@ Starts at $50/mo. One `pn_live_` key works across everything.
 hypernode merges two data sources that nobody else combines:
 
 - **Pre-consensus** — cancel and modify actions from the gossip protocol, before validators commit them. ~1 second ahead of the public API.
-- **Confirmed** — every order placement, fill, cancellation, and rejection from the non-validator node, after block commit.
+- **Confirmed** — every order placement, fill, cancellation, and rejection after a block commits.
 
 Every event is tagged `consensus: "pre"` or `consensus: "confirmed"` so you always know what you're looking at.
 

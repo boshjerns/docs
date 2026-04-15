@@ -1,10 +1,10 @@
 ---
 title: EVM RPC
 sidebarTitle: EVM RPC
-description: Dedicated Ethereum JSON-RPC for HyperEVM (chain 999), powered by our own non-validator node
+description: Dedicated Ethereum JSON-RPC for HyperEVM (chain 999) with no shared rate limits
 ---
 
-hypernode runs its own HyperLiquid non-validator node. The EVM RPC gives you direct access to it for HyperEVM queries and transaction submission. No shared public endpoint, no rate limit contention with other users.
+hypernode's EVM RPC is a dedicated endpoint for HyperEVM queries and transaction submission. No shared public endpoint, no rate limit contention with other users.
 
 <Note>
 This endpoint serves **HyperEVM** (chain ID 999), not HyperCore. HyperCore orders, fills, and the L1 matching engine are served by the [WebSocket stream](/api/connection) and [REST API](/rest/overview). The EVM RPC is for smart contract reads, token balances, and HyperEVM transaction submission.
@@ -51,7 +51,7 @@ curl -X POST https://hyper.polynode.dev/v2/evm \
 
 ## What this is
 
-This is a dedicated RPC powered by our own non-validator node running on bare metal. Your requests go directly to our node, not to a shared public endpoint. The same node that powers the unified WebSocket stream and L4 order book also serves this RPC.
+This is a dedicated RPC. Your requests go to your own capacity, not a shared public endpoint. One hypernode API key gives you HyperCore trading, the EVM RPC, the WebSocket stream, and the L4 order book.
 
 Combined with the HyperCore trading API, one hypernode key gives you both chains: place orders on HyperCore via `POST /v2/order`, read contracts and submit transactions on HyperEVM via `POST /v2/evm`.
 
