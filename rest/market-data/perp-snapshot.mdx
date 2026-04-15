@@ -44,25 +44,25 @@ Real response (captured from live production):
 
 Fields:
 
-<ParamField body="snapshotTimestamp" type="integer">
+<ResponseField name="snapshotTimestamp" type="integer">
   Unix millis when this snapshot was generated. Compare against your last-fetched value — if unchanged, the cached response hasn't been updated, so you can skip fetching the full payload.
-</ParamField>
+</ResponseField>
 
-<ParamField body="userCount" type="integer">
+<ResponseField name="userCount" type="integer">
   Number of traders with non-null clearinghouse state in this snapshot.
-</ParamField>
+</ResponseField>
 
-<ParamField body="totalQueried" type="integer">
+<ResponseField name="totalQueried" type="integer">
   Number of active addresses we queried (sourced from the live L4 order book).
-</ParamField>
+</ResponseField>
 
-<ParamField body="queryMs" type="integer">
+<ResponseField name="queryMs" type="integer">
   Milliseconds it took the background generator to rebuild the snapshot.
-</ParamField>
+</ResponseField>
 
-<ParamField body="sizeBytes" type="integer">
+<ResponseField name="sizeBytes" type="integer">
   Full response size in bytes.
-</ParamField>
+</ResponseField>
 
 ## Full perp snapshot
 
