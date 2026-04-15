@@ -51,3 +51,56 @@ ws.onclose = () => {
 ```
 
 On successful reconnect, reset your delay and re-send all subscription messages.
+
+## Full Python example
+
+A complete example that connects, authenticates, subscribes to fills, and processes events:
+
+```python
+import asyncio
+import json
+import websockets
+
+API_KEY = "pn_live_..."
+URL = f"wss://hyper.polynode.dev/ws?key={API_KEY}"
+
+async def main():
+    async with websockets.connect(URL) as ws:
+        # Subscribe to all fills across every market
+        await ws.send(json.dumps({
+            "action": "subscribe",
+            "filters": {"action_types": ["fill"]}
+        }))
+
+        async for raw in ws:
+            event = json.loads(raw)
+
+            # Ignore the subscription ack
+            if event.get("action") == "subscribed":
+                print(f"Subscribed (sub_id={event.get('sub_id')})")
+                continue
+
+            if event.get("type") == "fill":
+                data = event["data"]
+                print(f"{data['coin']} {data['sz']}@{data['px']} {data['dir']}")
+
+asyncio.run(main())
+```
+
+Install the websockets library with `pip install websockets` (not `pip install websocket`).
+
+### Subscription acknowledgement
+
+After a successful subscribe, the server sends one acknowledgement message before any events:
+
+```json
+{
+  "action": "subscribed",
+  "id": "default",
+  "sub_id": 8,
+  "total_subs": 3
+}
+```
+
+Match on `event.get("action") == "subscribed"` and skip it, then process events by `event["type"]`.
+

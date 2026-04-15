@@ -60,7 +60,7 @@ These appear after the validator processes the action. Every order placed on Hyp
 | `order_filled` | Order filled immediately | coin, side, px, sz, oid |
 | `order_canceled` | Order was canceled | coin, side, px, sz, oid |
 | `order_rejected` | Order rejected (see rejection reasons below) | coin, side, px, sz, status |
-| `fill` | Trade execution | coin, side, px, sz, dir, closedPnl, fee |
+| `fill` | Trade execution | coin, side (A/B), px, sz, dir, closedPnl, fee, liquidation |
 | `triggered` | Trigger/stop order activated (rare) | coin, side, px, sz |
 | `siblingFilledCanceled` | Sibling order canceled due to fill (rare) | coin, side, px, sz, oid |
 | `perpMaxPositionRejected` | Rejected due to max position limit (rare) | coin, side, px, sz |
@@ -82,7 +82,7 @@ These arrive before the validator commits them to a block:
 | `batchModify` | Modify existing orders | modifies[].oid, modifies[].order.price/size |
 | `scheduleCancel` | Dead man's switch | `data` is a number (cancel timestamp) |
 | `setReferrer` | Set referral code | `data` is a string (referral code) |
-| `evmRawTx` | EVM transaction | calldataLen, chainId, gas |
+| `evmRawTx` | Pre-block HyperEVM transaction | `data` (raw RLP-encoded signed tx hex string) |
 
 ## Confirmed order example
 
@@ -137,15 +137,36 @@ These arrive before the validator commits them to a block:
     "hash": "0xa9a32c7c2b7fb452ab1c...",
     "crossed": true,
     "builder": null,
-    "builderFee": null
+    "builderFee": null,
+    "liquidation": null
   },
   "network": "mainnet"
 }
 ```
 
+
+
+### Fill `dir` field values
+
+| Value | Meaning |
+|-------|---------|
+| `Open Long` | New long position opened |
+| `Open Short` | New short position opened |
+| `Close Long` | Existing long position closed |
+| `Close Short` | Existing short position closed |
+| `Long > Short` | Position flipped from long to short |
+| `Short > Long` | Position flipped from short to long |
+| `Buy` / `Sell` | Spot market fills |
+
+The `side` field is separate: `B` = bid (buy order), `A` = ask (sell order).
+
 ## Liquidation fill example
 
-Liquidation fills carry a `data.liquidation` object in addition to the standard fill fields. Use the `liquidations_only` filter to subscribe to only these events.
+<Warning>
+The `data.liquidation` field is **always present** on fill events. It is `null` when the fill is not part of a liquidation, and an object when it is. Do NOT check `"liquidation" in data` — that will be true for every fill. Check `data.liquidation !== null` instead.
+</Warning>
+
+Liquidation fills carry a populated `data.liquidation` object in addition to the standard fill fields. Use the `liquidations_only` filter to subscribe to only these events.
 
 ```json
 {
@@ -187,6 +208,67 @@ Both sides of a liquidation (the liquidated user and the liquidator) appear as s
 | `liquidatedUser` | Address of the account being liquidated |
 | `markPx` | Mark price at the moment of liquidation |
 | `method` | Liquidation method (currently `"market"` for all observed liquidations) |
+
+## evmRawTx example (pre-block HyperEVM)
+
+Every HyperEVM smart contract transaction appears as an `evmRawTx` event before it is included in a block. The `data` field is a hex string containing the full EIP-2718 envelope: a 1-byte tx type prefix followed by RLP-encoded transaction fields. There are **no top-level decoded fields** — you decode the hex to extract `to`, `calldata`, `chainId`, `gas`, etc.
+
+```json
+{
+  "block": 70861403,
+  "timestamp": 1776225421823,
+  "type": "evmRawTx",
+  "consensus": "pre",
+  "user": "0x000000362b9ddd0000000000333ce9b04c000000",
+  "data": "02f8d48203e782071084b2d05e0085746a52...",
+  "network": "mainnet"
+}
+```
+
+<Note>
+The `user` field on `evmRawTx` events is a gossip internal identifier, not the transaction sender. To get the real sender, you must recover it from the signature during decoding.
+</Note>
+
+### Decoding `data` (Python)
+
+The hex starts with the EIP-2718 tx type byte (`0x02` for EIP-1559). Everything after that is RLP:
+
+```python
+import rlp
+from eth_hash.auto import keccak
+
+def decode_evm_raw_tx(hex_data: str) -> dict:
+    raw = bytes.fromhex(hex_data)
+    tx_type = raw[0]
+
+    if tx_type == 0x02:
+        # EIP-1559: [chainId, nonce, maxPrioFee, maxFee, gas, to, value, data, accessList, v, r, s]
+        decoded = rlp.decode(raw[1:])
+        return {
+            "tx_hash": "0x" + keccak(raw).hex(),
+            "tx_type": tx_type,
+            "chain_id": int.from_bytes(decoded[0], "big"),
+            "nonce": int.from_bytes(decoded[1], "big"),
+            "max_fee_per_gas": int.from_bytes(decoded[3], "big"),
+            "gas_limit": int.from_bytes(decoded[4], "big"),
+            "to": "0x" + decoded[5].hex() if decoded[5] else None,
+            "value": int.from_bytes(decoded[6], "big"),
+            "calldata": decoded[7].hex(),
+            "function_selector": "0x" + decoded[7][:4].hex() if len(decoded[7]) >= 4 else None,
+        }
+    else:
+        raise ValueError(f"Unsupported tx type: {tx_type}")
+
+# Usage
+event = {"type": "evmRawTx", "data": "02f8d4820..."}
+decoded = decode_evm_raw_tx(event["data"])
+print(decoded["to"], decoded["function_selector"], decoded["chain_id"])
+# 0xa4ea0e42eaab32e638703db88da1192fb42517f4 0xf3dc4762 999
+```
+
+All observed `evmRawTx` events have been EIP-1559 (tx type `0x02`). `chainId` is always `999` (HyperEVM mainnet). Measured lead time vs HyperLiquid's public RPC: 250ms to 3 seconds, averaging ~1 second.
+
+See [EVM RPC](/rest/evm-rpc) for pointer-back info on why the HL RPC cannot serve this data.
 
 ## Pre-consensus cancel example
 

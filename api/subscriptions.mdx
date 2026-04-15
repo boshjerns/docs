@@ -112,3 +112,19 @@ Exceeding your subscription limit returns an error:
 ```json
 {"error": "subscription limit reached for growth tier (max 500)"}
 ```
+
+## HyperEVM transactions
+
+Subscribe to pre-block HyperEVM smart contract transactions using the `evmRawTx` action type:
+
+```json
+{
+  "action": "subscribe",
+  "filters": {
+    "action_types": ["evmRawTx"]
+  }
+}
+```
+
+Events arrive with `consensus: "pre"` and a `data` field containing the raw RLP-encoded signed transaction as a hex string. See [Event Types](/api/events#evmrawtx-example-pre-block-hyperevm) for the full decoding example.
+

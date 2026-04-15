@@ -82,6 +82,20 @@ ws.on("message", (raw) => {
 
 Subscribe to `"order"` to get all order lifecycle events. See [Event Format](/api/events) for the complete reference.
 
+
+## Batch queries
+
+Query position state, orders, or portfolios for up to **10,000 wallets** in a single request. Average latency: 0.12ms per wallet. Built for copy trading platforms, portfolio trackers, and whale monitoring.
+
+```bash
+curl -X POST https://hyper.polynode.dev/v2/batch/clearinghouse-states \
+  -H "x-api-key: YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"users": ["0x...","0x...","0x..."]}'
+```
+
+Four batch endpoints: `clearinghouse-states`, `spot-clearinghouse-states`, `open-orders`, `portfolios`. See [Batch Queries](/rest/user-data/batch-queries) for the full spec.
+
 ## REST API
 
 54 endpoints for trading, market data, user state, and DeFi on HyperLiquid.
