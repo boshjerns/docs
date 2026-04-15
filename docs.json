@@ -56,7 +56,8 @@
               "api/authentication",
               "api/subscriptions",
               "api/filters",
-              "api/events"
+              "api/events",
+              "api/session-replay"
             ]
           },
           {
@@ -130,7 +131,8 @@
               "rest/user-data/user-abstraction",
               "rest/user-data/user-builder-fee",
               "rest/user-data/user-multi-sig",
-              "rest/user-data/batch-queries"
+              "rest/user-data/batch-queries",
+              "rest/user-data/portfolio-state"
             ]
           },
           {
@@ -191,6 +193,18 @@
             "group": "Infrastructure",
             "pages": [
               "rest/evm-rpc"
+            ]
+          },
+          {
+            "group": "Snapshots",
+            "pages": [
+              "rest/snapshots/perp-snapshot"
+            ]
+          },
+          {
+            "group": "Additional",
+            "pages": [
+              "rest/additional"
             ]
           }
         ]
