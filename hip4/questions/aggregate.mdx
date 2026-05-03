@@ -1,0 +1,115 @@
+---
+title: GET /v1/questions/:qid/aggregate
+description: Cross-outcome math for a multi-outcome question — implied probabilities, favorite, total volume.
+---
+
+A "question" on HIP-4 is a group of related outcomes (e.g. "Which team wins the Super Bowl?" with 32 child outcomes, one per team). Each outcome trades independently as its own Yes/No binary, but you usually want them aggregated. This endpoint does that math.
+
+## Endpoint
+
+```
+GET /v1/questions/:qid/aggregate
+```
+
+The `:qid` is the integer `question_id` from `/v1/questions`.
+
+## Response
+
+```json
+{
+  "question_id": 7,
+  "name": "SuperBowl2027",
+  "description": "Which team wins Super Bowl LXI",
+  "outcome_count": 32,
+  "fallback_outcome": null,
+  "totals": {
+    "fills_count": 8421,
+    "unique_traders": 1240,
+    "volume_usdh": "456789.123456",
+    "sum_yes_probabilities": "1.04",
+    "implied_overround_pct": "4.0"
+  },
+  "favorite_outcome_id": 12,
+  "favorite_yes_mid": "0.34",
+  "resolved_outcomes": 0,
+  "active_outcomes": 32,
+  "outcomes": [
+    {
+      "outcome_id": 12,
+      "title": "Chiefs win Super Bowl LXI",
+      "status": "active",
+      "yes_mid": "0.34",
+      "fills_count": 2031,
+      "unique_traders": 488,
+      "volume_usdh": "120832.10"
+    },
+    { "outcome_id": 5, "title": "Eagles ...", "yes_mid": "0.18", "...": "..." }
+  ]
+}
+```
+
+| Top-level field | Description |
+|-------|-------------|
+| `outcome_count` | Number of child outcomes belonging to this question |
+| `fallback_outcome` | The outcome that wins if none of the others do (e.g. "field" for sports) |
+| `favorite_outcome_id` | Outcome with the highest current `yes_mid` |
+| `favorite_yes_mid` | The favorite's implied probability |
+| `resolved_outcomes` / `active_outcomes` | Status counts across the family |
+
+| `totals` field | Description |
+|-------|-------------|
+| `volume_usdh` | Σ lifetime volume across all child outcomes |
+| `unique_traders` | Σ across child outcomes — note this DOUBLE-COUNTS wallets that traded multiple legs |
+| `sum_yes_probabilities` | Σ of `yes_mid` across all outcomes. Should ≈ 1.0 in an efficient market |
+| `implied_overround_pct` | `(sum_yes_probabilities - 1) × 100`. Positive = book is "vigged" / overpriced; negative = arbitrage available |
+
+## Cross-outcome interpretations
+
+- **`sum_yes_probabilities ≈ 1.0`**: market is internally consistent. Buying every outcome's Yes share at mid would cost ~1 USDH per "complete set."
+- **`sum_yes_probabilities > 1.0`**: book is taking a vig — buying every Yes costs more than 1 USDH. The `implied_overround_pct` is the "rake."
+- **`sum_yes_probabilities < 1.0`**: theoretical arbitrage — buying every Yes for less than 1 USDH guarantees a payout of exactly 1. Watch for stale mids on illiquid sides before you act on this.
+
+## Use cases
+
+- **Question detail page** — render a sortable table of outcomes with implied probabilities.
+- **Find favorites + longshots** at a glance.
+- **Cross-outcome arbitrage scanner** — flag questions where `implied_overround_pct < 0`.
+- **Market efficiency comparison** — compare overround across questions to find which markets are most/least competitive.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+curl -H "X-API-Key: hip4_live_..." \
+  https://polynode-hip4-explorer.pages.dev/api/v1/questions/7/aggregate
+```
+
+```python Python
+import requests
+r = requests.get(f"https://.../api/v1/questions/{qid}/aggregate",
+                 headers={"X-API-Key": key}).json()
+print(f"Q: {r['name']}  ({r['outcome_count']} outcomes)")
+print(f"Sum yes-probs: {r['totals']['sum_yes_probabilities']}  "
+      f"(overround: {r['totals']['implied_overround_pct']}%)")
+print(f"Favorite: outcome_id={r['favorite_outcome_id']} @ {r['favorite_yes_mid']}")
+sorted_outcomes = sorted(r["outcomes"], key=lambda o: float(o["yes_mid"] or 0), reverse=True)
+for o in sorted_outcomes[:5]:
+    print(f"  {o['yes_mid']:>6}  vol=${o['volume_usdh']:>14}  {o['title']}")
+```
+</CodeGroup>
+
+## 404
+
+```
+HTTP 404
+{"error": "question 7 not found"}
+```
+
+Returned if the question doesn't exist. (No multi-outcome questions exist on HIP-4 mainnet at the moment of writing — the endpoint is ready and will populate as soon as one is deployed.)
+
+## Notes
+
+- `unique_traders` in `totals` is a Σ, NOT a distinct count across the question. A wallet that filled both leg A and leg B counts twice. Use `/v1/markets/:id/holders` per outcome for true distinct sets.
+- `sum_yes_probabilities` is computed from the latest poll mid per side (cadence ~1s). It can briefly be stale during fast moves.
+- `favorite_outcome_id` is whichever child has the highest `yes_mid` right now — recompute clientside if you want a 24h-stable favorite.
+- `volume_usdh` is lifetime; for 24h windows, query `/v1/leaderboards/markets?window=24h` and filter to the question's `outcome_ids`.

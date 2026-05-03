@@ -1,0 +1,96 @@
+---
+title: GET /v1/leaderboards/wallets
+description: Top wallets across all HIP-4 markets — by volume, PnL, fills, or markets traded.
+---
+
+A pre-computed leaderboard of every wallet that's traded HIP-4, refreshed every minute. Use this for "biggest traders," "biggest winners," or "most active" widgets.
+
+## Endpoint
+
+```
+GET /v1/leaderboards/wallets
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `by` | string | `"volume"` | One of `volume`, `net_pnl`, `realized_pnl`, `fills`, `outcomes` |
+| `min_fills` | int | 0 | Drop wallets with fewer than this many fills (filters spam/test wallets) |
+| `limit` | int | 100 | Max rows (cap 500) |
+
+## Response
+
+```json
+{
+  "ranked_by": "volume",
+  "min_fills": 0,
+  "count": 3,
+  "wallets": [
+    {
+      "rank": 1,
+      "user": "0x7bfee91193d9df2ac0bfe90191d40f23c773c060",
+      "outcomes_traded": 1,
+      "fills_count": 51,
+      "volume_usdh": "74099.887570",
+      "volume_bought": "74099.887570",
+      "volume_sold": "0",
+      "realized_pnl": "0",
+      "net_realized_pnl": "0",
+      "fees_paid_base": "0",
+      "fees_paid_builder": "0",
+      "fees_paid_deployer": "0",
+      "active_positions": 2,
+      "first_trade": { "us": 1777743445268000, "iso": "...", "relative": "57m ago" },
+      "last_trade":  { "us": 1777745154261000, "iso": "...", "relative": "29m ago" }
+    }
+  ]
+}
+```
+
+## Ranking modes
+
+- `by=volume` — highest gross USDH traded (bought + sold). Default.
+- `by=net_pnl` — `realized_pnl − all fees`. Use for "biggest winners (after fees)."
+- `by=realized_pnl` — gross realized, before fees.
+- `by=fills` — highest number of fills (active high-frequency wallets).
+- `by=outcomes` — number of distinct outcome_ids ever filled (diversification).
+
+## Use cases
+
+- **"Top 100 traders" widget** on a frontend.
+- **Whale watch alerts** — combine with `min_fills=10` to filter out single-trade noise.
+- **PnL leaderboards** — gross or net of fees, your call.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+# Top 50 by volume
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/wallets?limit=50"
+
+# Top 20 winners (net of fees), min 10 fills
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/wallets?by=net_pnl&limit=20&min_fills=10"
+```
+
+```python Python
+import requests
+r = requests.get(
+  "https://.../api/v1/leaderboards/wallets",
+  headers={"X-API-Key": key},
+  params={"by": "net_pnl", "limit": 50, "min_fills": 10}
+).json()
+for w in r["wallets"][:10]:
+    print(f"#{w['rank']:>3} {w['user'][:10]}...  "
+          f"net=${w['net_realized_pnl']}  vol=${w['volume_usdh']}  "
+          f"fills={w['fills_count']}")
+```
+</CodeGroup>
+
+## Notes
+
+- `realized_pnl` excludes settlement payouts — for closed-market P/L use `/v1/wallets/:addr/pnl`.
+- Refreshed every ~60s. For exact instantaneous numbers query `/v1/wallets/:addr` for one wallet.
+- `min_fills` operates on lifetime fills, not 24h. Don't use it as a "recently active" filter.

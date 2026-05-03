@@ -1,0 +1,94 @@
+---
+title: GET /v1/leaderboards/deployers
+description: Per-outcome deployer revenue — revenue earned by whoever deployed each market.
+---
+
+Each HIP-4 outcome has a deployer who can charge a fee on every fill (think Polymarket's market creator royalty). This endpoint ranks outcomes by how much their deployer has earned.
+
+## Endpoint
+
+```
+GET /v1/leaderboards/deployers
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `by` | string | `"revenue"` | One of `revenue`, `volume`, `bps` |
+| `limit` | int | 100 | Max rows (cap 500) |
+
+## Response
+
+```json
+{
+  "ranked_by": "revenue",
+  "count": 1,
+  "deployers": [
+    {
+      "rank": 1,
+      "outcome_id": 0,
+      "title": "BTC >= $78213 by 2026-05-03 06:00 UTC (1d)",
+      "outcome_name": "Recurring",
+      "underlying": "BTC",
+      "target_price": "78213",
+      "fills_count": 26732,
+      "volume_usdh": "1147289.829980",
+      "deployer_fees_total_usdh": "0",
+      "effective_bps": "0",
+      "distinct_fee_tokens": 1,
+      "first_trade": { "us": 1777719604322000, "iso": "...", "relative": "7h ago" },
+      "last_trade":  { "us": 1777743859009000, "iso": "...", "relative": "51m ago" }
+    }
+  ],
+  "note": "Deployer revenue is attributed per-outcome (the deployer of THAT outcome). Cross-outcome deployer aggregation is on the roadmap."
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `deployer_fees_total_usdh` | Lifetime USDH-equivalent collected by this outcome's deployer |
+| `effective_bps` | `deployer_fees_total / volume_usdh × 10000` — average rate charged |
+| `distinct_fee_tokens` | Number of different `fee_token` values seen (signals USDH vs share-side fees) |
+
+## Ranking modes
+
+- `by=revenue` — `deployer_fees_total` DESC. Default.
+- `by=volume` — outcomes with biggest USDH volume regardless of deployer fee.
+- `by=bps` — outcomes with the highest effective deployer rate. Useful for finding outliers.
+
+## Use cases
+
+- **Market-creator earnings dashboard** for HL teams running price-binary deployments.
+- **Find outliers** — outcomes with `effective_bps > 50` are charging unusually high deployer fees.
+- **Volume vs revenue analysis** — sort by volume, look at the bps column to see who's monetizing aggressively.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/deployers?limit=50"
+
+# Highest effective rate
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/deployers?by=bps&limit=10"
+```
+
+```python Python
+import requests
+r = requests.get("https://.../api/v1/leaderboards/deployers",
+                 headers={"X-API-Key": key},
+                 params={"by": "revenue"}).json()
+for d in r["deployers"][:10]:
+    print(f"#{d['rank']:>2} oid={d['outcome_id']:>4} "
+          f"vol=${d['volume_usdh']}  fees=${d['deployer_fees_total_usdh']}  "
+          f"bps={d['effective_bps']}  {d['title'][:50]}")
+```
+</CodeGroup>
+
+## Notes
+
+- Empty result when no HIP-4 outcomes have charged a deployer fee yet (current state — HIP-4 mainnet is hours old at writing).
+- `distinct_fee_tokens > 1` means the deployer has been collecting fees in different tokens across fills (e.g. some in USDH, some in share-side tokens).
+- The deployer-of-an-outcome address is not exposed in current state — this endpoint groups by `outcome_id`, not by deployer address. Cross-outcome aggregation will arrive in a future schema update.

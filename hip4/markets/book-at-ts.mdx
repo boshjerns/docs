@@ -1,0 +1,127 @@
+---
+title: GET /v1/markets/:id/book/at/:ts
+description: Reconstruct the orderbook at any past microsecond — exact L2 snapshot of resting orders.
+---
+
+Returns the L2 orderbook as it was at any historical timestamp `ts` (microseconds since epoch). Reconstruction is exact — every order is replayed from the indexed event stream, not sampled from polled snapshots. Same response shape as the live `/book` endpoint, plus a `history_starts` anchor and an `as_of` timestamp.
+
+## Endpoint
+
+```
+GET /v1/markets/:id/book/at/:ts
+```
+
+`:ts` is a microsecond UNIX timestamp. ISO-string conversion: `epoch_us = unix_seconds * 1_000_000`.
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `side` | int | both | `0` = Yes only, `1` = No only |
+| `levels` | int | 30 | Depth per side (max 200) |
+
+## Response
+
+```json
+{
+  "outcome_id": 0,
+  "as_of": { "us": 1777745497000000, "iso": "2026-05-02T18:11:37+00:00", "relative": "21m ago" },
+  "reconstructed_at": { "us": 1777749097000000, "iso": "...", "relative": "0s ago" },
+  "levels_per_side": 5,
+  "resting_orders_count": 597,
+  "history_starts": { "us": 1777719601071336, "iso": "2026-05-02T11:00:01.071336+00:00", "relative": "7h ago" },
+  "warning": null,
+  "sides": [
+    {
+      "side_index": 0,
+      "label": "Yes",
+      "coin": "#0",
+      "best_bid": "0.60363",
+      "best_ask": "0.60375",
+      "bids": [
+        { "price": "0.60363", "size": "100.0", "orders": 1, "makers": 1 }
+      ],
+      "asks": [
+        { "price": "0.60375", "size": "85.0", "orders": 1, "makers": 1 }
+      ]
+    },
+    { "side_index": 1, "label": "No", "...": "..." }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `as_of` | The timestamp the book was reconstructed for — exactly the `:ts` you passed |
+| `reconstructed_at` | When the request was processed (server-side now) |
+| `resting_orders_count` | Total live orders across all sides at `:ts` (sanity check) |
+| `history_starts` | Earliest event we indexed for this outcome — anchor for `:ts` validity |
+| `warning` | `"ts is before the earliest indexed event ..."` if `:ts < history_starts`, else `null` |
+
+## How it works
+
+Every snapshot is a deterministic replay of the indexed event stream up to `:ts`. There is no sampling, no polling, no smoothing — if a fill happened one microsecond before your timestamp, the size is reflected; one microsecond after and it isn't.
+
+## Use cases
+
+- **Pre-trade replay** — feed `:ts = trade_time - 1µs` to see exactly what book the trader saw before placing.
+- **Slippage backtests** — for any historical fill, compute realized vs theoretical at-time-of-decision.
+- **Liquidity migration analysis** — chart top-of-book depth over time without polling.
+- **Forensics** — investigate manipulation by reconstructing books around suspicious fills.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+# Book 1 hour ago
+TS=$(($(date +%s) - 3600))000000
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/book/at/${TS}?levels=10"
+
+# Book at the moment of a specific trade
+TID_TIME_US=1777745780036000
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/book/at/$((TID_TIME_US - 1))"
+```
+
+```python Python
+import requests, time
+
+# Hourly book snapshots over the last 6 hours
+addr = "https://.../api/v1/markets/0/book/at"
+now_us = int(time.time()) * 1_000_000
+for hours_ago in range(0, 7):
+    ts = now_us - (hours_ago * 3600 * 1_000_000)
+    r = requests.get(f"{addr}/{ts}", headers={"X-API-Key": key},
+                     params={"levels": 1}).json()
+    yes = r["sides"][0]
+    print(f"{hours_ago}h ago: bid={yes['best_bid']} ask={yes['best_ask']} "
+          f"orders={r['resting_orders_count']}")
+```
+
+```javascript JavaScript
+// Replay book at every fill in the last 100 trades
+const trades = await fetch(
+  `https://.../api/v1/markets/0/trades?limit=100`,
+  { headers: { 'X-API-Key': key } }
+).then(r => r.json())
+
+for (const t of trades.trades.slice(0, 5)) {
+  const tsBeforeFill = t.at.us - 1
+  const book = await fetch(
+    `https://.../api/v1/markets/0/book/at/${tsBeforeFill}?levels=1&side=${t.side_index}`,
+    { headers: { 'X-API-Key': key } }
+  ).then(r => r.json())
+  const yes = book.sides[0]
+  console.log(`fill @${t.px} sz=${t.sz} | book pre-fill: ${yes.best_bid} / ${yes.best_ask}`)
+}
+```
+</CodeGroup>
+
+## Notes
+
+- **Cost**: ~50–200ms per request depending on `:ts` and outcome activity. Costs grow with order activity in the window, not with how far back `:ts` is.
+- `:ts` in the future returns 400. `:ts` before `history_starts` returns an empty book with a `warning`. Both are intentional — no silent zeros.
+- `resting_orders_count` is the truth check — when reconstructing AT NOW, it matches the live book exactly (verified byte-for-byte against `/v1/markets/:id/book`).
+- For high-frequency replay across many timestamps, prefer one large query window via `/v1/markets/:id/depth-history` (coming soon) over many calls here.
+- This endpoint is rate-limited on your tier's per-minute quota like all `/v1/*` routes — heavy backtests should respect the limit.

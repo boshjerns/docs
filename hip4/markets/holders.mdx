@@ -1,0 +1,97 @@
+---
+title: GET /v1/markets/:id/holders
+description: Top traders on a single market — by position size, realized PnL, or volume.
+---
+
+Returns wallets active on a market, ranked by your chosen metric, with their cost basis, realized PnL, and volume.
+
+## Endpoint
+
+```
+GET /v1/markets/:id/holders
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `by` | string | `"amount"` | One of `amount`, `pnl`, `volume` |
+| `limit` | int | 100 | Max rows (cap 500) |
+
+## Response
+
+```json
+{
+  "outcome_id": 0,
+  "ranked_by": "amount",
+  "count": 3,
+  "holders": [
+    {
+      "user": "0x7bfee91193d9df2ac0bfe90191d40f23c773c060",
+      "coin": "#0",
+      "side_index": 0,
+      "side_label": "Yes",
+      "position_kind": "long",
+      "amount": "106443.0",
+      "avg_cost": "0.6478362141239912441400561803",
+      "realized_pnl": "0",
+      "fills_count": 40,
+      "volume_bought": "68957.630140",
+      "volume_sold": "0",
+      "first_trade": { "us": 1777743454987000, "iso": "...", "relative": "36m ago" },
+      "last_trade":  { "us": 1777745109029000, "iso": "...", "relative": "9m ago" }
+    },
+    {
+      "user": "0x...",
+      "coin": "#1",
+      "side_index": 1,
+      "side_label": "No",
+      "position_kind": "long",
+      "amount": "58769.0",
+      "avg_cost": "0.3521636697918970886011332505",
+      "realized_pnl": "0",
+      "fills_count": 8,
+      ...
+    }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `position_kind` | `"long"` (positive amount), `"short"` (negative), `"flat"` (zero) |
+| `amount` | Current position size in shares — signed |
+| `avg_cost` | Weighted-average cost basis in USDH per share |
+| `realized_pnl` | Cumulative PnL from intraday closes (excludes settlement) |
+| `volume_bought` / `volume_sold` | Lifetime USDH spent / received |
+
+## Ranking modes
+
+- `by=amount` — sorted by `ABS(amount)` DESC. Use this for "biggest positions" leaderboards.
+- `by=pnl` — sorted by `realized_pnl` DESC. Use for "biggest winners on this market."
+- `by=volume` — sorted by `(bought + sold)` DESC. Use for "most active wallets on this market."
+
+## Use cases
+
+- **Whale watch on a single market.**
+- **Leaderboard widgets** in front-end UIs.
+- **Pre-resolution exposure check** — who stands to win/lose what.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+# Top 50 holders by current size
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/holders?by=amount&limit=50"
+
+# Top winners
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/holders?by=pnl&limit=20"
+```
+</CodeGroup>
+
+## Notes
+
+- Includes BOTH sides of the market — Yes holders and No holders interleaved by rank.
+- For one-side analytics, filter client-side on `side_index`.

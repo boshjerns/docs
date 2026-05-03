@@ -1,0 +1,68 @@
+---
+title: GET /v1/fee-schedule
+description: Live fee rates + the meaning of every fee_token value.
+---
+
+Computes effective fee rates over the last 7 days from actual fills, and explains the cryptic `fee_token` values you'll see in trade responses.
+
+## Endpoint
+
+```
+GET /v1/fee-schedule
+```
+
+## Why use this
+
+Hyperliquid records `fee_token` as `USDH`, `+0`, `+1`, etc. These look opaque. This endpoint resolves them: which side they apply to, what they mean, and what rates are actually being charged today.
+
+## Response
+
+```json
+{
+  "computed_window": "last 7 days",
+  "pct_fills_with_fee": 0.011,
+  "effective_rates_bps": {
+    "base_fee": "0.058",
+    "builder_fee": "0.058",
+    "deployer_fee": "0.000"
+  },
+  "fee_tokens": [
+    {
+      "raw": "USDH",
+      "label": "USDH",
+      "description": "Stable HIP-4 collateral. Paid on sell-side fills.",
+      "applies_to": "sell"
+    },
+    {
+      "raw": "+0",
+      "label": "Yes shares",
+      "description": "Buy-side fee deducted from received YES outcome shares (currently 0% rate).",
+      "applies_to": "buy"
+    },
+    {
+      "raw": "+1",
+      "label": "No shares",
+      "description": "Buy-side fee deducted from received NO outcome shares (currently 0% rate).",
+      "applies_to": "buy"
+    }
+  ],
+  "explanation": {
+    "sell_side": "Fee in USDH (HIP-4 collateral). Currently ~5 bps on takers, slightly less on makers.",
+    "buy_side": "Fee in the received outcome shares (+N where N = side_index of bought coin). Currently 0 bps."
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `computed_window` | Period over which effective rates are calculated |
+| `pct_fills_with_fee` | Fraction of fills with non-zero fee — most are zero on HIP-4 |
+| `effective_rates_bps.base_fee` | Aggregate base fee rate in basis points |
+| `effective_rates_bps.builder_fee` | Builder-routed fee rate |
+| `effective_rates_bps.deployer_fee` | Per-outcome deployer fee (HIP-4 unique mechanic) |
+| `fee_tokens` | Each known fee token with full enrichment |
+
+## Notes
+
+- HIP-4's deployer fee mechanic exists in protocol but is currently 0 bps for all observed fills.
+- `+N` notation in HIP-4 refers to the spot token at index N. For HIP-4 fills, `+0`/`+1` map to the outcome's Yes/No shares received in a buy.

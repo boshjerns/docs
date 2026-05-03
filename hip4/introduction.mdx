@@ -1,0 +1,62 @@
+---
+title: HIP-4 Predictions API
+description: Live indexed data for every HIP-4 prediction market on Hyperliquid.
+---
+
+The HIP-4 Predictions API exposes every order, fill, position, and settlement on Hyperliquid's HIP-4 prediction markets through fast REST endpoints over a live HIP-4 event stream. Data lands ~5 seconds behind real-time and is queryable forever.
+
+## Why this API exists
+
+Hyperliquid's native `/info` endpoint can answer "what's the live state right now?" — but it can't answer:
+
+- "Show me every trade Wallet X has ever made on HIP-4."
+- "What did the orderbook for the BTC daily look like 2 hours ago?"
+- "Who are the top market makers across all open HIP-4 markets right now?"
+- "Reconstruct the resolution payouts for outcome 0."
+- "Show me a 1-minute OHLC chart of implied probability."
+
+Those questions all require **historical event capture + derived state**. We index every event the moment it lands, run weighted-average cost-basis math on every fill (validated byte-perfect against Polymarket's data-api math), and expose it through this REST surface.
+
+## The shape of every response
+
+Every coded field arrives **enriched** — both the raw value and a human-readable explanation:
+
+```json
+{
+  "fee_token": {
+    "raw": "+0",
+    "label": "Yes shares",
+    "description": "Buy-side fee deducted from received YES outcome shares (currently 0% rate).",
+    "applies_to": "buy"
+  }
+}
+```
+
+You never need to consult external docs to interpret a status, side, fee_token, period, or order type. The field tells you what it means.
+
+## Quickstart
+
+```bash
+curl -H "X-API-Key: hip4_live_..." \
+     https://polynode-hip4-explorer.pages.dev/api/v1/markets
+```
+
+That's it. See [Authentication](/authentication/quickstart) to get a key.
+
+## Differentiators
+
+- **Historical L2 orderbook reconstruction** at any past timestamp (millisecond precision since launch). Hydromancer offers 1-minute snapshots weekly; we replay every event exactly.
+- **Question-grouped analytics** — HIP-4 wraps multiple outcomes per question; we aggregate cross-outcome.
+- **Settlement payout reconstruction** as clean events, not derived from `userFills + ledger` subtraction.
+- **Per-deployer revenue** (HIP-4-unique mechanic with no aggregation endpoint anywhere else).
+- **Cross-market whale tracking** in a single query.
+
+## Pricing tiers
+
+| Tier | Rate Limit | Price |
+|------|-----------|-------|
+| **Free** | 600 req/min (10/sec) | $0 |
+| **Pro** | 6,000 req/min (100/sec) | $50/mo |
+| **Enterprise** | 60,000 req/min (1K/sec) | Custom |
+
+Generous free tier; Pro undercuts the next-cheapest competitor by 6×. See [Rate Limits](/authentication/rate-limits).

@@ -1,0 +1,102 @@
+---
+title: GET /v1/markets
+description: List of HIP-4 outcomes with current implied probability + lifetime stats.
+---
+
+Returns all HIP-4 outcomes currently active (or filterable to other statuses), each enriched with current Yes/No mid prices and lifetime activity rollups.
+
+## Endpoint
+
+```
+GET /v1/markets
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `status` | string | `"active"` | One of `active`, `resolved`, `all` |
+| `underlying` | string | — | Filter by underlying asset (e.g. `BTC`, `ETH`) |
+| `period` | string | — | Filter by recurrence period (`1m`, `1h`, `1d`, etc.) |
+
+## Response
+
+```json
+{
+  "count": 1,
+  "markets": [
+    {
+      "outcome_id": 0,
+      "title": "BTC >= $78213 by 2026-05-03 06:00 UTC (1d)",
+      "name": "Recurring",
+      "status": "active",
+      "class": {
+        "raw": "priceBinary",
+        "label": "Binary outcome (Yes / No)",
+        "description": "Two-sided market that resolves on whether an underlying price crosses a target by an expiry."
+      },
+      "underlying": "BTC",
+      "target_price": "78213",
+      "period": {
+        "raw": "1d",
+        "label": "1 day",
+        "description": "Recurring market with a 1 day cycle.",
+        "applies_to": "86400"
+      },
+      "expiry": {
+        "us": 1777788000000000,
+        "iso": "2026-05-03T06:00:00+00:00",
+        "relative": "in 12h"
+      },
+      "deployed_at": { "us": 1777727054207215, "iso": "...", "relative": "4h ago" },
+      "question_id": null,
+      "question_name": null,
+      "sides": [
+        { "side_index": 0, "label": "Yes", "coin": "#0", "asset_id": 100000000, "current_mid": "0.64832" },
+        { "side_index": 1, "label": "No",  "coin": "#1", "asset_id": 100000001, "current_mid": "0.35168" }
+      ],
+      "lifetime": {
+        "fills": 26732,
+        "unique_traders": 1299,
+        "volume_usdh": "1147289.829980"
+      }
+    }
+  ]
+}
+```
+
+## Notes
+
+- Sorted by lifetime volume DESC.
+- `current_mid` per side is the most recent computed mid price (last_trade-based, matches HL's `allMids`).
+- Cached at edge for 15 seconds.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/markets?status=active"
+```
+
+```javascript JavaScript
+const { markets } = await fetch(
+  'https://polynode-hip4-explorer.pages.dev/api/v1/markets',
+  { headers: { 'X-API-Key': key } }
+).then(r => r.json())
+
+markets.forEach(m => {
+  console.log(`${m.title}  Yes=${m.sides[0].current_mid}  No=${m.sides[1].current_mid}`)
+})
+```
+
+```python Python
+import requests
+r = requests.get('https://.../api/v1/markets',
+  headers={'X-API-Key': key}).json()
+for m in r['markets']:
+    yes = m['sides'][0]['current_mid']
+    no  = m['sides'][1]['current_mid']
+    print(f"{m['title']:60} Yes={yes} No={no}")
+```
+</CodeGroup>

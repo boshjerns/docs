@@ -1,0 +1,96 @@
+---
+title: GET /v1/leaderboards/builders
+description: Top builders (frontends/UIs that route HL orders) — by revenue, volume, fills, or unique users.
+---
+
+A "builder" on Hyperliquid is a frontend/UI that routes a user's order through itself in exchange for an optional builder fee (think Phantom for Solana, or any custom HL UI). This endpoint ranks them by what they're capturing on HIP-4 markets.
+
+## Endpoint
+
+```
+GET /v1/leaderboards/builders
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `by` | string | `"revenue"` | One of `revenue`, `volume`, `fills`, `users` |
+| `limit` | int | 100 | Max rows (cap 500) |
+
+## Response
+
+```json
+{
+  "ranked_by": "revenue",
+  "count": 3,
+  "builders": [
+    {
+      "rank": 1,
+      "builder_addr": "0xb84c7fb41ee7d8781e2b0d59eed2accd2ae99533",
+      "fills_count": 344,
+      "unique_users": 6,
+      "unique_outcomes": 1,
+      "volume_usdh": "14296.808060",
+      "builder_fees_total_usdh": "2.80447791",
+      "market_share_pct": "0.16060788145399383904",
+      "first_seen": { "us": 1777726493006000, "iso": "...", "relative": "5h ago" },
+      "last_seen":  { "us": 1777742873043000, "iso": "...", "relative": "1h ago" }
+    }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `builder_addr` | The wallet that receives builder fees on this builder's flow |
+| `builder_fees_total_usdh` | Lifetime USDH (or USDH-equivalent buy-side) collected by this builder |
+| `market_share_pct` | Builder's share of total HIP-4 volume, expressed as a decimal % (0.16 = 16%) |
+| `unique_users` | Distinct wallets that have routed through this builder |
+| `unique_outcomes` | Distinct outcome_ids this builder has touched |
+
+## Ranking modes
+
+- `by=revenue` — `builder_fees_total` DESC. The "who's making money" leaderboard. Default.
+- `by=volume` — total USDH routed through, regardless of fee rate.
+- `by=fills` — count of fills routed.
+- `by=users` — distinct wallets that have used this builder.
+
+## Use cases
+
+- **Track a competing UI's growth** by polling weekly and watching `volume_usdh` climb.
+- **Identify integration partners** — top builders by `unique_users` are well-distributed UIs worth talking to.
+- **Effective fee rate analysis** — `builder_fees_total / volume_usdh × 10000 = bps` charged.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+# Top 20 by revenue
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/builders?limit=20"
+
+# Top by volume routed
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/builders?by=volume"
+```
+
+```python Python
+import requests
+r = requests.get("https://.../api/v1/leaderboards/builders",
+                 headers={"X-API-Key": key},
+                 params={"by": "revenue", "limit": 25}).json()
+for b in r["builders"]:
+    bps = (float(b['builder_fees_total_usdh']) /
+           float(b['volume_usdh']) * 10000) if float(b['volume_usdh']) > 0 else 0
+    print(f"#{b['rank']:>2} {b['builder_addr'][:10]}...  "
+          f"vol=${b['volume_usdh']}  fees=${b['builder_fees_total_usdh']}  "
+          f"({bps:.1f} bps)  {b['unique_users']} users")
+```
+</CodeGroup>
+
+## Notes
+
+- Builders without a `builder_addr` (default HL frontend, or programmatic API users) are excluded.
+- `market_share_pct` is recomputed every minute.
+- Builder fees can be charged as a percentage of size — `bps` may vary across this builder's fills.

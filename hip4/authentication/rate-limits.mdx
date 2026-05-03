@@ -1,0 +1,59 @@
+---
+title: Rate Limits
+description: Tiers, per-key limits, the global ceiling, and how the token bucket works.
+---
+
+## Tiers
+
+| Tier | Per-Key Limit | Effective | Price |
+|------|---------------|-----------|-------|
+| **Free** | 600 req/min | 10 req/sec sustained | $0 |
+| **Pro** | 6,000 req/min | 100 req/sec sustained | $50/mo |
+| **Enterprise** | 60,000 req/min | 1,000 req/sec sustained | Custom |
+
+There is also a **global ceiling** of 1,800,000 req/min (30,000 req/sec aggregate across every key). It exists to protect the system from runaway / coordinated abuse. Customers should never hit it under normal operation.
+
+## How it actually works
+
+We use a **token bucket** algorithm. Your tier defines a bucket size and refill rate.
+
+- Free tier bucket: holds up to 600 tokens, refills at 10 tokens/sec.
+- Each request consumes 1 token.
+- If the bucket is empty: request returns **HTTP 429**.
+- Idle time refills the bucket — burst as much as you need within the bucket size.
+
+This means **a free-tier key can burst up to 600 requests instantly** if it hasn't sent any in a minute. If it sustains traffic above 10/sec the bucket drains and returns 429 until it refills.
+
+In practice this is the better integration experience: you can do quick batch fetches without artificially sleeping between requests, just don't sustain heavy traffic.
+
+## Hitting a limit — what to do
+
+```json
+{
+  "error": "rate limit exceeded for tier 'free' (600 req/min)",
+  "tier": "free",
+  "limit": 600
+}
+```
+
+When you see this:
+
+1. **Back off**. The bucket refills at the per-tier rate. Wait ~6 seconds for free tier to recover ~60 tokens.
+2. **Check if you should be cached**. Most queries (markets, leaderboards, candles) are eligible for client-side or edge caching.
+3. **Upgrade your tier** if your usage is sustained.
+
+## Built-in retry-friendly headers
+
+We don't currently expose `Retry-After` or `X-RateLimit-Remaining` headers (planned). For now: assume linear refill at the per-tier rate after a 429.
+
+## Edge caching
+
+The Pages Function in front of the API caches GET responses at the Cloudflare edge with sane TTLs:
+
+- `/v1/meta`, `/v1/spot-tokens` — 1 hour
+- `/v1/markets` — 15 seconds
+- `/v1/markets/:id`, `/v1/coins/:c` — 5 seconds
+- `/v1/leaderboards/*` — 60 seconds
+- `/v1/markets/:id/trades` — 1 second
+
+Cached responses don't count toward your rate limit. If you're hitting limits, your traffic pattern probably bypasses the cache (lots of unique URLs).

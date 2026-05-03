@@ -1,0 +1,41 @@
+---
+title: GET /v1/questions
+description: List multi-outcome question groupings.
+---
+
+HIP-4 supports both binary outcomes (Yes/No) and multi-outcome **questions** that wrap N related outcomes (e.g. "Who wins NFL MVP" with one outcome per candidate). This endpoint returns the question metadata.
+
+## Endpoint
+
+```
+GET /v1/questions
+```
+
+## Response
+
+```json
+{
+  "count": 0,
+  "questions": []
+}
+```
+
+When questions exist, each entry returns:
+
+```json
+{
+  "question_id": 1,
+  "name": "...",
+  "description": "...",
+  "outcome_ids": [10, 11, 12],
+  "outcome_count": 3,
+  "fallback_outcome": null,
+  "deployed_at": { "us": 1777..., "iso": "...", "relative": "..." }
+}
+```
+
+## Notes
+
+As of this writing, no multi-outcome questions are deployed on HIP-4 mainnet. The endpoint is ready for when they appear. We recommend polling weekly until activity is observed; mid-day polling once questions exist.
+
+For aggregating data across the outcomes belonging to one question (sum-of-probabilities, top holders across the whole event), see the upcoming `/v1/questions/:qid/aggregate` endpoint.

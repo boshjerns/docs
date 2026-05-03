@@ -1,0 +1,92 @@
+---
+title: GET /v1/wallets/:addr
+description: Lifetime + current snapshot for a single wallet across all HIP-4 markets.
+---
+
+One call, every number you need to render a wallet card: lifetime volume, fills, realized PnL, fees paid, open positions, open orders, unrealized estimate, and first/last trade timestamps.
+
+## Endpoint
+
+```
+GET /v1/wallets/:addr
+```
+
+The `:addr` is a 0x-prefixed 40-char hex Ethereum address. Case-insensitive — the response always returns it lowercased.
+
+## Response (wallet found)
+
+```json
+{
+  "user": "0x14bb5440db38aa9f4eb3f11f9c12965ea6c342aa",
+  "found": true,
+  "lifetime": {
+    "outcomes_traded": 1,
+    "fills_count": 397,
+    "volume_usdh": "68633.712290",
+    "volume_bought": "39741.081010",
+    "volume_sold": "28892.631280",
+    "realized_pnl": "-1139.4111699999999999999999999",
+    "fees_paid_base": "0",
+    "fees_paid_builder": "0",
+    "fees_paid_deployer": "0",
+    "net_realized_pnl": "-1139.4111699999999999999999999"
+  },
+  "current": {
+    "active_positions": 1,
+    "open_orders": 0,
+    "unrealized_pnl_estimate": "-407.03856000000000000000000250"
+  },
+  "first_trade": { "us": 1777738712050000, "iso": "2026-05-02T16:18:32.050+00:00", "relative": "2h ago" },
+  "last_trade":  { "us": 1777745780036000, "iso": "2026-05-02T18:16:20.036+00:00", "relative": "11m ago" }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `lifetime.realized_pnl` | Sum of intraday-close PnL — does NOT include settlement payouts |
+| `lifetime.net_realized_pnl` | `realized_pnl - all fees paid` |
+| `current.unrealized_pnl_estimate` | `Σ amount × (current_mid − avg_cost)` over open positions. Mark-to-mid, not bid/ask |
+| `outcomes_traded` | Count of distinct outcome_ids ever filled |
+| `volume_usdh` | Lifetime gross USDH traded (bought + sold) |
+
+## Response (wallet not found)
+
+```json
+{
+  "user": "0x0000000000000000000000000000000000000001",
+  "found": false,
+  "note": "no fills indexed for this wallet on HIP-4 markets"
+}
+```
+
+We return HTTP 200 with `found: false` rather than 404, so you can distinguish "wallet hasn't traded HIP-4" from "address syntactically invalid".
+
+## Use cases
+
+- **Profile cards** — top-of-page summary on a wallet detail view.
+- **Quick filtering** — "show me only wallets with > 100 fills" before paginating into trades.
+- **Active vs cold wallets** — `last_trade.relative` immediately tells you whether the wallet is still trading.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+curl -H "X-API-Key: hip4_live_..." \
+  https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0x14bb5440db38aa9f4eb3f11f9c12965ea6c342aa
+```
+
+```python Python
+import requests
+addr = "0x14bb5440db38aa9f4eb3f11f9c12965ea6c342aa"
+r = requests.get(f"https://.../api/v1/wallets/{addr}",
+                 headers={"X-API-Key": key}).json()
+print(f"{r['lifetime']['fills_count']} fills, "
+      f"{r['lifetime']['volume_usdh']} USDH lifetime, "
+      f"{r['current']['unrealized_pnl_estimate']} unrealized")
+```
+</CodeGroup>
+
+## Notes
+
+- All `*_pnl` fields are returned as decimal strings to avoid float rounding — parse with a decimal lib if you sum them.
+- `realized_pnl` reflects the wavg cost-basis algorithm on intraday closes only. After resolution, see `settlement_realized_pnl` per-position.

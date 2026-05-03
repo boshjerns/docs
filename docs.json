@@ -11,6 +11,73 @@
   "navigation": {
     "tabs": [
       {
+        "tab": "HIP-4",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "hip4/introduction",
+              "hip4/authentication/quickstart",
+              "hip4/authentication/rate-limits",
+              "hip4/authentication/errors"
+            ]
+          },
+          {
+            "group": "Discovery",
+            "pages": [
+              "hip4/api/health",
+              "hip4/api/stats",
+              "hip4/api/meta",
+              "hip4/api/fee-schedule",
+              "hip4/api/spot-tokens",
+              "hip4/api/coins"
+            ]
+          },
+          {
+            "group": "Markets",
+            "pages": [
+              "hip4/markets/list",
+              "hip4/markets/detail",
+              "hip4/markets/book",
+              "hip4/markets/book-at-ts",
+              "hip4/markets/depth-history",
+              "hip4/markets/trades",
+              "hip4/markets/candles",
+              "hip4/markets/holders"
+            ]
+          },
+          {
+            "group": "Questions",
+            "pages": [
+              "hip4/api/questions",
+              "hip4/questions/aggregate"
+            ]
+          },
+          {
+            "group": "Wallets",
+            "pages": [
+              "hip4/wallets/summary",
+              "hip4/wallets/positions",
+              "hip4/wallets/trades",
+              "hip4/wallets/orders",
+              "hip4/wallets/pnl",
+              "hip4/wallets/activity",
+              "hip4/wallets/settlements"
+            ]
+          },
+          {
+            "group": "Leaderboards",
+            "pages": [
+              "hip4/leaderboards/wallets",
+              "hip4/leaderboards/builders",
+              "hip4/leaderboards/deployers",
+              "hip4/leaderboards/markets",
+              "hip4/leaderboards/whales"
+            ]
+          }
+        ]
+      },
+      {
         "tab": "Guides",
         "groups": [
           {

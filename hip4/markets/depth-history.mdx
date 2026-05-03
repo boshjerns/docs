@@ -1,0 +1,157 @@
+---
+title: GET /v1/markets/:id/depth-history
+description: Top-of-book + depth time series — orderbook snapshots at evenly-spaced timestamps.
+---
+
+For any window `[from, to]` and bucket size `step`, returns one orderbook snapshot per bucket: top-of-book bid/ask, mid, spread, total resting orders, total maker count, and depth aggregated across the top-N levels per side.
+
+Each snapshot is built by the same engine as `/v1/markets/:id/book/at/:ts` — verified byte-for-byte against that endpoint.
+
+## Endpoint
+
+```
+GET /v1/markets/:id/depth-history
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `from` | int | `to − step × (limit − 1)` | Lower bound `time_us` |
+| `to` | int | now | Upper bound `time_us` |
+| `step` | string | `"5m"` | Bucket size: `1m`, `5m`, `15m`, `1h`, `4h`, `1d` |
+| `side` | int | both | `0` = Yes only, `1` = No only |
+| `depth_levels` | int | 5 | Top-N levels to sum into `bids_top_size` / `asks_top_size` (cap 50) |
+| `limit` | int | 60 | Max number of snapshots to return (cap 500) |
+
+If both `from` and `limit` are omitted, you get the **last `limit × step` worth of buckets ending at now** — sane default for a "show me depth over the last hour" call.
+
+## Response
+
+```json
+{
+  "outcome_id": 0,
+  "from": { "us": 1777748663000000, "iso": "...", "relative": "25m ago" },
+  "to":   { "us": 1777750163000000, "iso": "...", "relative": "0s ago" },
+  "step": { "raw": "5m", "label": "5 minutes", "description": "...", "applies_to": "300" },
+  "depth_levels_aggregated": 5,
+  "sides": [0, 1],
+  "points_requested": 6,
+  "points_returned": 6,
+  "points": [
+    {
+      "t": 1777748663000000,
+      "iso": "2026-05-02T18:24:23+00:00",
+      "snapshots": [
+        {
+          "side_index": 0, "label": "Yes",
+          "best_bid": "0.63337",
+          "best_ask": "0.63824",
+          "mid": "0.6358050",
+          "spread": "0.00487",
+          "bid_levels_count": 121,
+          "ask_levels_count": 95,
+          "bid_orders_total": 244,
+          "ask_orders_total": 198,
+          "bid_makers_total": 87,
+          "ask_makers_total": 76,
+          "bids_top_size": "1842.0",
+          "asks_top_size": "1518.0"
+        },
+        { "side_index": 1, "label": "No", "...": "..." }
+      ]
+    }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `points[i].t` / `iso` | The exact `:ts` used to reconstruct this point |
+| `snapshots[].best_bid` / `best_ask` | Top of book at this `t` for this side |
+| `snapshots[].mid` | `(best_bid + best_ask) / 2`, null if either side empty |
+| `snapshots[].spread` | `best_ask − best_bid`, null if either side empty |
+| `snapshots[].bid_levels_count` / `ask_levels_count` | Distinct price levels resting that side |
+| `snapshots[].bid_orders_total` / `ask_orders_total` | Total resting order count that side |
+| `snapshots[].bid_makers_total` / `ask_makers_total` | Distinct wallet count |
+| `snapshots[].bids_top_size` / `asks_top_size` | Σ size across the top `depth_levels` levels — pure liquidity proxy |
+
+## Use cases
+
+- **Spread / liquidity charts** — render line charts of `mid`, `spread`, `bids_top_size` over a chosen window.
+- **Volatility surveys** — large `spread` values flag illiquid regimes; small spreads + thick top-of-book = healthy market.
+- **Pre-resolution liquidity profiling** — call this with `step=1m` against the final hour before settlement to see how liquidity behaves as expiry approaches.
+- **Cross-market comparison** — bulk-call across multiple `outcome_id`s to compare which is most liquid.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+# Last hour, 1-minute bars (60 points)
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/depth-history?step=1m&limit=60"
+
+# Last 4 hours, 5m, Yes side only
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/depth-history?step=5m&limit=48&side=0"
+
+# Specific window, 15m bars
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/depth-history?from=1777732000000000&to=1777750000000000&step=15m"
+```
+
+```python Python
+import requests
+
+# Plot mid + spread over the last 4 hours at 5-min cadence
+r = requests.get("https://.../api/v1/markets/0/depth-history",
+                 headers={"X-API-Key": key},
+                 params={"step": "5m", "limit": 48, "side": 0}).json()
+for p in r["points"]:
+    s = p["snapshots"][0]
+    print(f"{p['iso'][11:19]}  mid={s['mid'] or '-'}  spread={s['spread'] or '-'}  "
+          f"top5_size_bid={s['bids_top_size']}  top5_size_ask={s['asks_top_size']}")
+```
+
+```javascript JavaScript
+// Render a sparkline of yes-side mid over the last hour
+const r = await fetch(
+  `https://.../api/v1/markets/0/depth-history?step=1m&limit=60&side=0`,
+  { headers: { 'X-API-Key': key } }
+).then(r => r.json())
+
+const series = r.points.map(p => ({
+  t: p.t / 1_000_000,                       // → seconds
+  mid: parseFloat(p.snapshots[0].mid),
+  spread: parseFloat(p.snapshots[0].spread)
+}))
+// series → feed your chart library
+```
+</CodeGroup>
+
+## Performance
+
+- Each snapshot triggers one read query per requested side. Queries fan out at concurrency 8 against a 32-slot pool, so a single `depth-history` call cannot starve other API traffic.
+- 12 points (1h × 5m): ~1–2s typical
+- 60 points (1h × 1m): ~5s typical
+- 240 points (4h × 1m): ~25s typical
+- 500 points (cap): ~60s
+
+For tight latency budgets, use larger `step` values. For exact instantaneous quotes use `/v1/markets/:id/book` (live, edge-cached 1s).
+
+## Errors
+
+| Code | Error | Meaning |
+|------|-------|---------|
+| 400 | `step must be one of: 1m, 5m, 15m, 1h, 4h, 1d` | Step enum not in allow-list |
+| 400 | `from must be <= to` | Invalid window |
+| 400 | `to is in the future` | `to` more than 60s past `now` |
+| 400 | `from/to must be non-negative microsecond epochs` | Negative timestamps |
+| 401 | `missing X-API-Key header` | Auth required |
+| 429 | `rate limit exceeded` | Tier quota reached — back off and retry |
+
+## Notes
+
+- Snapshot at the exact returned `t` is reproducible by calling `/v1/markets/:id/book/at/:t` — same numbers.
+- Empty book (e.g. `t < history_starts`) returns `null` for `best_bid`/`best_ask`/`mid`/`spread` and zeros for size/count fields.
+- `points_returned` may be less than `points_requested` only when the window doesn't fit `limit` buckets.

@@ -1,0 +1,76 @@
+---
+title: Errors
+description: Standard error response shape + common error codes.
+---
+
+All error responses use this shape:
+
+```json
+{ "error": "human-readable explanation" }
+```
+
+Some endpoints include extra context fields (`tier`, `limit`, `hint`, etc.) when useful.
+
+## HTTP status codes
+
+| Code | Meaning | Common causes |
+|------|---------|---------------|
+| **200** | OK | |
+| **400** | Bad Request | Invalid query parameters, unsupported `period`, malformed timestamp |
+| **401** | Unauthorized | Missing or invalid `X-API-Key` |
+| **404** | Not Found | Path doesn't exist OR resource doesn't exist (e.g. unknown outcome_id) |
+| **413** | Payload Too Large | Request body exceeds 20KB |
+| **429** | Too Many Requests | Rate limit hit (per-key or global) |
+| **500** | Internal Server Error | Database error or unexpected failure |
+| **503** | Service Unavailable | Database briefly unreachable, or global ceiling hit |
+
+## Examples
+
+### Missing API key
+
+```bash
+$ curl https://.../api/v1/markets
+```
+```
+HTTP 401
+{"error":"missing X-API-Key header","hint":"include header X-API-Key: hip4_live_..."}
+```
+
+### Rate limit exceeded
+
+```
+HTTP 429
+{
+  "error": "rate limit exceeded for tier 'free' (600 req/min)",
+  "tier":  "free",
+  "limit": 600
+}
+```
+
+### Invalid period parameter
+
+```bash
+$ curl ".../api/v1/markets/0/candles?period=2m" -H "X-API-Key: ..."
+```
+```
+HTTP 400
+{"error":"period must be one of 1m, 5m, 15m, 1h, 4h, 1d"}
+```
+
+### Unknown outcome
+
+```bash
+$ curl .../api/v1/markets/9999 -H "X-API-Key: ..."
+```
+```
+HTTP 404
+{"error":"outcome 9999 not found"}
+```
+
+## Retry strategy
+
+For 429 errors: back off based on your tier's refill rate (free=10s/100 tokens, pro=10s/1000, enterprise=10s/10000).
+
+For 500/503: exponential backoff starting at 1s, max 30s, max 5 retries. These should be rare.
+
+Never retry 400 / 401 / 404 — those reflect client-side bugs.

@@ -1,0 +1,28 @@
+---
+title: GET /v1/spot-tokens
+description: Hyperliquid spot token reference.
+---
+
+Returns the index → name mapping for Hyperliquid's spot token registry. Used for resolving `+N` references in fee tokens and elsewhere.
+
+## Endpoint
+
+```
+GET /v1/spot-tokens
+```
+
+## Response
+
+```json
+{
+  "tokens": [
+    {"index": 0, "name": "USDC"},
+    {"index": 1, "name": "PURR"}
+  ],
+  "note": "Currently a static stub returning the most common references. The full 458-token spot registry will be exposed in a near-term update."
+}
+```
+
+## Status
+
+This endpoint is currently a static stub returning the most common references. The full 458-token spot registry will be exposed in a near-term update.

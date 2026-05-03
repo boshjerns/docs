@@ -1,0 +1,73 @@
+---
+title: GET /v1/coins/:coin
+description: Resolve a coin name (#N) or asset_id to its outcome + side metadata.
+---
+
+Decodes `#N` coin names or numeric asset_ids into structured outcome metadata. Use this when you have a coin reference from somewhere (a fill, an order) and need to know what market + side it's for.
+
+## Endpoint
+
+```
+GET /v1/coins/:coin
+```
+
+The `:coin` path parameter accepts:
+- `#N` (URL-encoded as `%23N`) — e.g. `/v1/coins/%230`
+- A bare integer N — e.g. `/v1/coins/0`
+- A full asset_id — e.g. `/v1/coins/100000000`
+
+## Response
+
+```json
+{
+  "coin": {
+    "raw": "#0",
+    "outcome_id": 0,
+    "side_index": 0,
+    "asset_id": 100000000,
+    "side_label": "Yes",
+    "market_title": "BTC >= $78213 by 2026-05-03 06:00 UTC (1d)"
+  },
+  "outcome": {
+    "outcome_id": 0,
+    "name": "Recurring",
+    "title": "BTC >= $78213 by 2026-05-03 06:00 UTC (1d)",
+    "status": "active",
+    "underlying": "BTC",
+    "target_price": "78213",
+    "expiry_str": "20260503-0600"
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `coin.raw` | The `#N` form |
+| `coin.outcome_id` | Decoded `N / 10` |
+| `coin.side_index` | Decoded `N % 10` |
+| `coin.asset_id` | `100_000_000 + N` |
+| `coin.side_label` | `"Yes"` for side 0, `"No"` for side 1 |
+| `coin.market_title` | Human-readable composed title |
+| `outcome` | Full outcome metadata (or `null` if not found) |
+
+## Why use this
+
+When a webhook gives you a fill with `coin: "#0"`, you don't have to maintain a coin → market map yourself. Resolve it once, cache it client-side. The `market_title` is suitable for direct display.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/coins/%230"
+```
+
+```javascript JavaScript
+const coin = await fetch(
+  `https://.../api/v1/coins/${encodeURIComponent('#0')}`,
+  { headers: { 'X-API-Key': key } }
+).then(r => r.json())
+console.log(coin.coin.market_title)
+// → "BTC >= $78213 by 2026-05-03 06:00 UTC (1d)"
+```
+</CodeGroup>

@@ -1,0 +1,59 @@
+---
+title: GET /v1/stats
+description: Lifetime aggregate counters across all HIP-4 markets.
+---
+
+Returns lifetime totals: orders captured, fills, USDH volume, unique wallets, active + resolved market counts.
+
+## Endpoint
+
+```
+GET /v1/stats
+```
+
+## Why use this
+
+- Dashboard "totals" widgets.
+- Sanity-check growth curves (volume over time).
+- Confirm the indexer has captured the history you expect.
+
+## Response
+
+```json
+{
+  "lifetime_orders": 149363,
+  "lifetime_fills": 27118,
+  "lifetime_volume_usdh": "1147289.829980",
+  "unique_wallets_seen": 1325,
+  "active_markets": 1,
+  "resolved_markets": 0,
+  "open_positions": 1239,
+  "open_orders": 659,
+  "indexed_since": {
+    "us": 1777719604322000,
+    "iso": "2026-05-02T11:00:04.322+00:00",
+    "relative": "6h ago"
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `lifetime_orders` | Total order events captured |
+| `lifetime_fills` | Total filled trades |
+| `lifetime_volume_usdh` | `SUM(px × sz)` across all fills, USDH |
+| `unique_wallets_seen` | Distinct addresses with ≥1 fill |
+| `active_markets` | Outcomes currently live |
+| `resolved_markets` | Outcomes that have resolved |
+| `open_positions` | Wallet × asset pairs with non-zero amount |
+| `open_orders` | Currently resting in book |
+| `indexed_since` | Earliest event timestamp we've captured |
+
+## Examples
+
+<CodeGroup>
+```bash curl
+curl -H "X-API-Key: hip4_live_..." \
+  https://polynode-hip4-explorer.pages.dev/api/v1/stats
+```
+</CodeGroup>

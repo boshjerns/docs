@@ -1,0 +1,119 @@
+---
+title: GET /v1/wallets/:addr/positions
+description: Per-market positions for a wallet — amount, cost basis, mark-to-mid PnL, settlement payout if resolved.
+---
+
+Returns one row per `(outcome_id, side_index)` the wallet has ever held. Sorted by absolute current market value (biggest exposure first).
+
+## Endpoint
+
+```
+GET /v1/wallets/:addr/positions
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `status` | string | `"open"` | One of `open` (`amount != 0`), `settled` (resolved markets), `all` |
+| `limit` | int | 500 | Max rows (cap 2000) |
+
+## Response
+
+```json
+{
+  "user": "0x14bb5440db38aa9f4eb3f11f9c12965ea6c342aa",
+  "status_filter": "open",
+  "count": 1,
+  "positions": [
+    {
+      "outcome_id": 0,
+      "title": "BTC >= $78213 by 2026-05-03 06:00 UTC (1d)",
+      "outcome_status": "active",
+      "coin": "#1",
+      "asset_id": 100000001,
+      "side_index": 1,
+      "side_label": "No",
+      "position_kind": "long",
+      "amount": "25000.0",
+      "avg_cost": "0.3883615424000000000000000001",
+      "current_mid": "0.37929",
+      "market_value_usdh": "9482.250000",
+      "unrealized_pnl_estimate": "-226.78856000000000000000000250",
+      "realized_pnl": "0",
+      "fills_count": 77,
+      "volume_bought": "9709.038560",
+      "volume_sold": "0",
+      "shares_bought": "25000.0",
+      "shares_sold": "0",
+      "fees": { "base": "0", "builder": "0", "deployer": "0" },
+      "first_trade": { "us": 1777745480041000, "iso": "...", "relative": "16m ago" },
+      "last_trade":  { "us": 1777745780036000, "iso": "...", "relative": "11m ago" },
+      "settled_at": null,
+      "settlement_payout": null,
+      "settlement_realized_pnl": null
+    }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `position_kind` | `"long"` (positive amount), `"short"` (negative), `"flat"` (zero) |
+| `amount` | Current share balance — signed |
+| `avg_cost` | Weighted-average cost basis in USDH per share |
+| `current_mid` | `(top_bid + top_ask) / 2` for this side at last poll |
+| `market_value_usdh` | `amount × current_mid` |
+| `unrealized_pnl_estimate` | `amount × (current_mid − avg_cost)` |
+| `realized_pnl` | Cumulative intraday-close PnL — excludes settlement |
+| `settlement_payout` | USDH credited at resolution (only set after the market settles) |
+| `settlement_realized_pnl` | `settlement_payout − (avg_cost × shares_held_at_settle)` |
+
+## Use cases
+
+- **Portfolio view** — render one row per position with mark-to-mid PnL.
+- **Risk/exposure** — `Σ market_value_usdh` over rows = current notional risk.
+- **Closed-position tax/audit log** — `status=settled` returns every resolved market the wallet touched, with payout and PnL.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+# All open positions
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0x14bb...c342aa/positions"
+
+# Settled markets only
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0x14bb...c342aa/positions?status=settled"
+```
+
+```javascript JavaScript
+const r = await fetch(
+  `https://.../api/v1/wallets/${addr}/positions?status=open`,
+  { headers: { 'X-API-Key': key } }
+).then(r => r.json())
+
+const totalExposure = r.positions
+  .reduce((s, p) => s + parseFloat(p.market_value_usdh || 0), 0)
+console.log(`Open exposure: $${totalExposure.toFixed(2)} USDH`)
+```
+
+```python Python
+import requests
+r = requests.get(
+  f"https://.../api/v1/wallets/{addr}/positions",
+  headers={"X-API-Key": key}, params={"status": "open"}
+).json()
+for p in r["positions"]:
+    print(f"#{p['coin']:>4} {p['side_label']:>3} "
+          f"amt={p['amount']:>10} avg={p['avg_cost'][:6]} "
+          f"mid={p['current_mid']} uPnL={p['unrealized_pnl_estimate']}")
+```
+</CodeGroup>
+
+## Notes
+
+- `current_mid` reflects the most recent allMids snapshot (poll cadence ~1s). For instantaneous quotes use `/v1/markets/:id/book`.
+- An "open" position means `amount != 0`. A wallet may have BOTH a Yes and a No leg open simultaneously — those are two rows.
+- Cost basis uses weighted-average — Polymarket-style — not FIFO. Close-then-reopen keeps the same row (avg_cost recomputes).

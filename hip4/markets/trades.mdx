@@ -1,0 +1,115 @@
+---
+title: GET /v1/markets/:id/trades
+description: Recent fills on a market with full enrichment.
+---
+
+Returns recent (or historical) fills on a market, paginated by `time_us`. Every row includes enriched `side`, `role` (taker/maker), `fee_token`, and timestamps.
+
+## Endpoint
+
+```
+GET /v1/markets/:id/trades
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `side` | int | both | Filter to side 0 (Yes) or 1 (No) |
+| `from` | int | — | Lower bound, microseconds since epoch |
+| `to` | int | — | Upper bound, microseconds since epoch |
+| `limit` | int | 100 | Max rows (cap 1000) |
+
+## Response (single trade row)
+
+```json
+{
+  "tid": 12345,
+  "oid": 407740089995,
+  "user": "0x67afd7c25c6743fa5caab7a7f4ac038f1eaa4d56",
+  "coin": "#0",
+  "side_index": 0,
+  "side_label": "Yes",
+  "side": {
+    "raw": "B", "label": "buy",
+    "description": "Bid side — buying outcome shares with USDH."
+  },
+  "px": "0.60573",
+  "sz": "1.0",
+  "notional_usdh": "0.605730",
+  "role": {
+    "raw": "false", "label": "maker",
+    "description": "Provided liquidity — order was sitting in book before being filled."
+  },
+  "direction": "Buy",
+  "closed_pnl": "0",
+  "fee": "0",
+  "fee_token": {
+    "raw": "+0", "label": "Yes shares",
+    "description": "Buy-side fee deducted from received YES outcome shares (currently 0% rate).",
+    "applies_to": "buy"
+  },
+  "builder_fee": null,
+  "builder_addr": null,
+  "deployer_fee": null,
+  "tx_hash": "0x...",
+  "at": { "us": 1777745649368000, "iso": "2026-05-02T18:14:09.368+00:00", "relative": "2s ago" }
+}
+```
+
+## Response wrapper
+
+```json
+{
+  "outcome_id": 0,
+  "count": 100,
+  "limit": 100,
+  "trades": [ ... ]
+}
+```
+
+## Use cases
+
+- **Activity feeds** — render the most recent trades.
+- **Backfill** — page through historical trades by setting `to=<earliest you have>` and re-querying.
+- **Volume reconstruction** — sum `notional_usdh` across all fills in a window.
+- **Whale detection** — filter rows where `notional_usdh > 1000`.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+# Last 10 trades on outcome 0
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/trades?limit=10"
+
+# All trades since a specific timestamp
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/trades?from=1777740000000000&limit=500"
+```
+
+```python Python
+import requests
+# Page through last 24h
+import time
+ago_24h_us = (int(time.time()) - 86400) * 1_000_000
+all_trades = []
+to = None
+while True:
+    params = {'limit': 1000, 'from': ago_24h_us}
+    if to: params['to'] = to
+    r = requests.get('https://.../api/v1/markets/0/trades',
+                     headers={'X-API-Key': key}, params=params).json()
+    if not r['trades']: break
+    all_trades += r['trades']
+    to = r['trades'][-1]['at']['us'] - 1
+print(f"24h trades: {len(all_trades)}")
+```
+</CodeGroup>
+
+## Notes
+
+- Sorted reverse-chronological (newest first).
+- `notional_usdh` is computed as `px × sz` server-side.
+- `closed_pnl` is HL's per-fill realized PnL field — it's only set when the fill closes a position.
+- Edge-cached for 1 second.

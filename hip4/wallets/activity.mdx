@@ -1,0 +1,137 @@
+---
+title: GET /v1/wallets/:addr/activity
+description: Unified time-ordered feed of every event for a wallet — trades, order events, ledger updates, settlements.
+---
+
+One call, four event types merged into a single chronological stream. Each row has a `kind` field (`trade`, `order`, `ledger`, `settlement`) plus the type-specific payload. Use this to render an activity feed without making four separate requests.
+
+## Endpoint
+
+```
+GET /v1/wallets/:addr/activity
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `kinds` | string CSV | all | Filter to specific kinds: `trade,order,ledger,settlement` |
+| `from` | int | 0 | Lower bound `time_us` |
+| `to` | int | — | Upper bound `time_us` |
+| `limit` | int | 200 | Max rows total across all kinds (cap 1000) |
+
+## Response (one row per `kind`)
+
+```json
+{
+  "user": "0xfaa4982c67494d8e778dd970236cf6b3d7a95d46",
+  "kinds_included": ["ledger", "order", "settlement", "trade"],
+  "count": 5,
+  "limit": 5,
+  "activity": [
+    {
+      "kind": "order",
+      "at": { "us": 1777747230234902, "iso": "...", "relative": "12m ago" },
+      "oid": 407758903701,
+      "status": { "raw": "open", "label": "open", "description": "Order placed and resting in the book." },
+      "outcome_id": 0,
+      "coin": "#0",
+      "side_index": 0,
+      "side_label": "Yes",
+      "side": { "raw": "B", "label": "buy", "description": "..." },
+      "limit_px": "0.64404",
+      "sz": "16.0",
+      "orig_sz": "16.0",
+      "order_type": "Limit",
+      "tif": { "raw": "Ioc", "label": "Immediate Or Cancel", "description": "..." }
+    },
+    {
+      "kind": "trade",
+      "at": { "us": 1777745780036000, "iso": "...", "relative": "36m ago" },
+      "tid": 315031529611098, "oid": 407741532851,
+      "outcome_id": 0, "coin": "#1",
+      "side_index": 1, "side_label": "No",
+      "side": { "raw": "B", "label": "buy", "description": "..." },
+      "px": "0.40485", "sz": "18.0", "notional_usdh": "7.287300",
+      "role": { "raw": "true", "label": "taker", "description": "..." },
+      "direction": "Buy",
+      "closed_pnl": "0", "fee": "0",
+      "fee_token": { "raw": "+1", "label": "No shares", "description": "..." }
+    },
+    {
+      "kind": "ledger",
+      "at": { "us": 1777733000000000, "iso": "...", "relative": "5h ago" },
+      "id": 142,
+      "delta_type": "spotTransfer",
+      "tx_hash": "0x...",
+      "counterparty": "0x...",
+      "token": "USDH",
+      "amount": "1000.0",
+      "usdc_value": "1000.0"
+    },
+    {
+      "kind": "settlement",
+      "at": { "us": 1777788000000000, "iso": "...", "relative": "12h ago" },
+      "outcome_id": 0,
+      "held_amount": "1000.0",
+      "avg_cost": "0.65",
+      "winning_side": 0,
+      "held_winning": true,
+      "payout_per_share": "1",
+      "payout_total": "1000.0",
+      "realized_pnl": "350.0"
+    }
+  ]
+}
+```
+
+## Event kinds
+
+| Kind | What it is |
+|------|------------|
+| `trade` | A fill on one of your orders (or one of your makers being hit) |
+| `order` | Order placement, fill, cancel, rejection — the full state machine |
+| `ledger` | Spot-balance changes: transfers, sends, borrows, lending |
+| `settlement` | Market resolution event with payout + realized PnL |
+
+## Use cases
+
+- **Wallet activity feed** — render a unified stream like Etherscan or Polymarket's "Activity" tab.
+- **Audit trail** — every state change to a wallet's HIP-4 footprint, time-ordered.
+- **Filter to specific event** — `kinds=ledger` for a deposits-only view, `kinds=settlement` for a closed-trade log.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+# Last 100 events of any kind
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0xfaa4...5d46/activity?limit=100"
+
+# Only trades + settlements (clean P/L view)
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0xfaa4...5d46/activity?kinds=trade,settlement"
+```
+
+```python Python
+import requests
+r = requests.get(f"https://.../api/v1/wallets/{addr}/activity",
+                 headers={"X-API-Key": key},
+                 params={"limit": 100, "kinds": "trade,order"}).json()
+for e in r["activity"]:
+    if e["kind"] == "trade":
+        print(f"{e['at']['relative']:>10}  TRADE  "
+              f"{e['side']['label']:>4} {e['sz']:>8} @{e['px']}  "
+              f"({e['role']['label']})")
+    elif e["kind"] == "order":
+        print(f"{e['at']['relative']:>10}  ORDER  "
+              f"{e['status']['label']:>15}  oid={e['oid']}")
+```
+</CodeGroup>
+
+## Notes
+
+- The `limit` is global across all kinds — if you ask for 200 with all 4 kinds enabled, you get 200 events total (newest-first), not 200 of each.
+- Events sorted reverse-chronological by `time_us` (or `settled_us` for settlements).
+- Same `tid` will appear once per fill — both sides of a self-trade show as separate rows.
+- Order placements that immediately fill produce BOTH an `order` event (with status `open` then `filled`) AND a `trade` event with the same `oid`.

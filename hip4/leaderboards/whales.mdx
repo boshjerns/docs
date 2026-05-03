@@ -1,0 +1,113 @@
+---
+title: GET /v1/leaderboards/whales
+description: Biggest open positions cross-market — single positions or per-wallet aggregates.
+---
+
+Surfaces the largest open exposures in HIP-4. Two modes:
+
+- Per-position (default): rows are individual `(wallet, outcome, side)` rows ordered by notional or share count.
+- Per-wallet: rows are wallets ordered by `Σ |amount × mark_price|` across all their open positions.
+
+Mark price is the latest poll mid for that side, falling back to `avg_cost` if no recent mid.
+
+## Endpoint
+
+```
+GET /v1/leaderboards/whales
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `by` | string | `"notional"` | One of `notional`, `shares`, `wallet_total` |
+| `limit` | int | 100 | Max rows (cap 500) |
+
+## Response — per-position (`by=notional` or `by=shares`)
+
+```json
+{
+  "ranked_by": "notional",
+  "count": 1,
+  "whales": [
+    {
+      "rank": 1,
+      "user": "0x7bfee91193d9df2ac0bfe90191d40f23c773c060",
+      "outcome_id": 0,
+      "title": "BTC >= $78213 by 2026-05-03 06:00 UTC (1d)",
+      "outcome_status": "active",
+      "coin": "#0",
+      "side_index": 0,
+      "side_label": "Yes",
+      "amount": "106443.0",
+      "avg_cost": "0.6478362141239912441400561803",
+      "current_mid": "0.64498",
+      "notional_usdh": "68653.606140",
+      "fills_count": 40,
+      "last_trade": { "us": 1777745109029000, "iso": "...", "relative": "30m ago" }
+    }
+  ]
+}
+```
+
+## Response — per-wallet (`by=wallet_total`)
+
+```json
+{
+  "ranked_by": "wallet_total",
+  "count": 1,
+  "whales": [
+    {
+      "rank": 1,
+      "user": "0x7bfee91193d9df2ac0bfe90191d40f23c773c060",
+      "total_notional_usdh": "73891.628130",
+      "total_shares_open": "121152.0",
+      "positions_count": 2
+    }
+  ]
+}
+```
+
+## Ranking modes
+
+- `by=notional` — single-position notional, mark-to-mid. Use for "biggest single bet on the platform."
+- `by=shares` — single-position absolute share count. Useful when you care about market impact, not USDH.
+- `by=wallet_total` — sum across all open positions per wallet. Use for "biggest wallets by open exposure."
+
+## Use cases
+
+- **Whale watch dashboards** — top exposures across all HIP-4 markets.
+- **Pre-resolution risk view** — combine with each market's expiry to see whose positions are about to settle.
+- **Liquidity stress** — `by=shares` to find positions that would dump huge supply if closed.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+# Biggest single positions by USDH notional
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/whales?limit=20"
+
+# Biggest wallets cross-market
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/whales?by=wallet_total&limit=50"
+```
+
+```python Python
+import requests
+r = requests.get("https://.../api/v1/leaderboards/whales",
+                 headers={"X-API-Key": key},
+                 params={"by": "notional", "limit": 25}).json()
+for w in r["whales"]:
+    print(f"#{w['rank']:>2} {w['user'][:10]}...  "
+          f"{w['side_label']:>3} {float(w['amount']):>10.0f} sh  "
+          f"@avg={w['avg_cost'][:6]} mid={w['current_mid']}  "
+          f"${w['notional_usdh']}  {w['title']}")
+```
+</CodeGroup>
+
+## Notes
+
+- Mid price is from the most recent allMids snapshot — for some sides with no resting maker the mid may be missing, in which case `avg_cost` is used as the fallback mark.
+- Positions where `amount = 0` are excluded.
+- A single wallet can appear multiple times in `by=notional` mode — once per `(outcome, side)` it has open. To get one row per wallet, use `by=wallet_total`.

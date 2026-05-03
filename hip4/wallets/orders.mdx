@@ -1,0 +1,88 @@
+---
+title: GET /v1/wallets/:addr/orders
+description: Live resting limit orders — every order this wallet currently has in any HIP-4 book.
+---
+
+Returns the wallet's open-orders snapshot — orders that are placed and resting in the book right now. Filled, canceled, or rejected orders do NOT appear here (use `/v1/wallets/:addr/trades` for fill history).
+
+## Endpoint
+
+```
+GET /v1/wallets/:addr/orders
+```
+
+No query parameters.
+
+## Response
+
+```json
+{
+  "user": "0x6abc111bd22bb38e649f81be60dfbeb35648aac6",
+  "count": 9,
+  "orders": [
+    {
+      "oid": 407574079390,
+      "outcome_id": 0,
+      "title": "BTC >= $78213 by 2026-05-03 06:00 UTC (1d)",
+      "coin": "#1",
+      "side_index": 1,
+      "side_label": "No",
+      "side": {
+        "raw": "A", "label": "sell",
+        "description": "Ask side — selling outcome shares for USDH."
+      },
+      "limit_px": "0.40999",
+      "size_remaining": "1500.0",
+      "size_original": "1500.0",
+      "order_type": "Limit",
+      "tif": {
+        "raw": "Gtc", "label": "Good Till Cancel",
+        "description": "Resting order; lives until canceled or filled."
+      },
+      "builder_addr": null,
+      "placed_at":      { "us": 1777732120399000, "iso": "...", "relative": "3h ago" },
+      "last_status_at": { "us": 1777732120399276, "iso": "...", "relative": "3h ago" }
+    }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `size_remaining` | Unfilled portion of the order |
+| `size_original` | Original size at placement (size_remaining ≤ size_original) |
+| `tif` | Time-in-force: `Alo` (post-only), `Gtc` (resting), `Ioc` (immediate-or-cancel), `FrontendMarket` |
+| `placed_at` | When the order first hit the book |
+| `last_status_at` | Latest order-event timestamp (placement, partial fill, etc.) |
+
+## Use cases
+
+- **Open-orders panel** in a portfolio UI.
+- **Maker-flow tracking** — pair with `/positions` to see exposure + intent on a wallet.
+- **Cancel-side analytics** — diff snapshots over time to detect order churn / spoofing patterns.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+curl -H "X-API-Key: hip4_live_..." \
+  https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0x6abc...aac6/orders
+```
+
+```javascript JavaScript
+const r = await fetch(
+  `https://.../api/v1/wallets/${addr}/orders`,
+  { headers: { 'X-API-Key': key } }
+).then(r => r.json())
+
+const restingNotional = r.orders.reduce((s, o) =>
+  s + parseFloat(o.size_remaining) * parseFloat(o.limit_px), 0)
+console.log(`${r.count} orders, $${restingNotional.toFixed(2)} resting`)
+```
+</CodeGroup>
+
+## Notes
+
+- Only orders where `size_remaining > 0` appear. A fully-filled order moves into `/trades`.
+- `Ioc` and `FrontendMarket` orders rarely sit here long enough to be seen — they fill or cancel within milliseconds.
+- Orders sorted newest-first by `placed_at`.

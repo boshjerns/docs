@@ -1,0 +1,110 @@
+---
+title: GET /v1/markets/:id/candles
+description: OHLCV bars with implied probability + VWAP per period.
+---
+
+Returns time-series OHLCV bars for one side of a market, with volume in USDH and shares, trade count, VWAP, and implied probability close. Standard charting input.
+
+## Endpoint
+
+```
+GET /v1/markets/:id/candles
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `side` | int | 0 | Side index — 0 (Yes) or 1 (No) |
+| `period` | string | `"1m"` | One of `1m`, `5m`, `15m`, `1h`, `4h`, `1d` |
+| `from` | int | — | Lower bound bucket start, microseconds |
+| `to` | int | — | Upper bound, microseconds |
+| `limit` | int | 500 | Max bars (cap 5000) |
+
+## Response
+
+```json
+{
+  "outcome_id": 0,
+  "side_index": 0,
+  "side_label": "Yes",
+  "period": { "raw": "5m", "label": "5 minutes", "description": "...", "applies_to": "300" },
+  "count": 3,
+  "candles": [
+    {
+      "t": 1777745400000000,
+      "iso": "2026-05-02T18:10:00+00:00",
+      "o": "0.63354",
+      "h": "0.63443",
+      "l": "0.60329",
+      "c": "0.60573",
+      "v_shares": "10755.0",
+      "v_usdh": "6711.991240",
+      "trades": 150,
+      "vwap": "0.62408100790330079033",
+      "implied_prob_close": "0.60573"
+    },
+    {
+      "t": 1777745100000000,
+      "iso": "2026-05-02T18:05:00+00:00",
+      "o": "0.64776",
+      "h": "0.6504",
+      "l": "0.62832",
+      "c": "0.63653",
+      "v_shares": "54215.0",
+      "v_usdh": "34771.579480",
+      "trades": 229,
+      "vwap": "0.64136455741031079959",
+      "implied_prob_close": "0.63653"
+    }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `t` | Bucket start timestamp in microseconds |
+| `iso` | Bucket start as ISO 8601 |
+| `o` `h` `l` `c` | Open / high / low / close — first, max, min, last fill price in the bucket |
+| `v_shares` | Total share volume traded |
+| `v_usdh` | Total USDH notional — `SUM(px × sz)` |
+| `trades` | Number of fills in the bucket |
+| `vwap` | Volume-weighted average price |
+| `implied_prob_close` | Same as `c` — the probability the market assigned to this side at bucket close |
+
+## Use cases
+
+- **TradingView-style charts** of implied probability over time.
+- **Volatility backtests** — feed `o`/`h`/`l`/`c` into standard OHLC indicators.
+- **Resolution prep** — chart the last hour before expiry to see how confident the market got.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+# Last 24 5-minute bars for outcome 0 Yes side
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/candles?period=5m&limit=24"
+
+# 1-hour bars from a specific date
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/candles?period=1h&from=1777680000000000"
+```
+
+```python Python
+import requests
+r = requests.get(
+  'https://.../api/v1/markets/0/candles',
+  headers={'X-API-Key': key},
+  params={'period': '5m', 'limit': 288}  # 24h of 5m bars
+).json()
+for c in reversed(r['candles']):
+    print(f"{c['iso']}  O:{c['o']} H:{c['h']} L:{c['l']} C:{c['c']}  V:{c['v_usdh']}")
+```
+</CodeGroup>
+
+## Notes
+
+- Bars are returned newest-first.
+- A bar exists only if at least one fill occurred in the bucket.
+- For sides with no recent activity, the bar series will be sparse.

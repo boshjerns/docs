@@ -1,0 +1,120 @@
+---
+title: GET /v1/wallets/:addr/trades
+description: Every fill on every HIP-4 market for a single wallet, paginated by time.
+---
+
+Returns historical fills for one wallet, optionally filtered to a single market or time window. Same enriched row shape as `/v1/markets/:id/trades`, scoped to `user_addr`.
+
+## Endpoint
+
+```
+GET /v1/wallets/:addr/trades
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `outcome_id` | int | — | Filter to a single market |
+| `from` | int | — | Lower bound `time_us` (microseconds since epoch) |
+| `to` | int | — | Upper bound `time_us` |
+| `limit` | int | 100 | Max rows (cap 1000) |
+
+## Response (single trade row)
+
+```json
+{
+  "tid": 315031529611098,
+  "oid": 407741532851,
+  "outcome_id": 0,
+  "coin": "#1",
+  "side_index": 1,
+  "side_label": "No",
+  "side": {
+    "raw": "B", "label": "buy",
+    "description": "Bid side — buying outcome shares with USDH."
+  },
+  "px": "0.40485",
+  "sz": "18.0",
+  "notional_usdh": "7.287300",
+  "role": {
+    "raw": "true", "label": "taker",
+    "description": "Removed liquidity by crossing the spread."
+  },
+  "direction": "Buy",
+  "closed_pnl": "0",
+  "fee": "0",
+  "fee_token": {
+    "raw": "+1", "label": "No shares",
+    "description": "Buy-side fee deducted from received NO outcome shares (currently 0% rate).",
+    "applies_to": "buy"
+  },
+  "builder_fee": null,
+  "builder_addr": null,
+  "deployer_fee": null,
+  "tx_hash": "0x000...000",
+  "at": { "us": 1777745780036000, "iso": "2026-05-02T18:16:20.036+00:00", "relative": "11m ago" }
+}
+```
+
+## Response wrapper
+
+```json
+{
+  "user": "0x14bb5440db38aa9f4eb3f11f9c12965ea6c342aa",
+  "count": 100,
+  "limit": 100,
+  "trades": [ ... ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `tid` | HL trade ID — unique per fill |
+| `oid` | HL order ID — multiple fills can share an `oid` for partial-fill orders |
+| `direction` | HL's per-fill action label (`Buy`, `Sell`, `Open Long`, `Close Short`, etc.) |
+| `closed_pnl` | HL's per-fill realized PnL — only set when this fill closes a position |
+
+## Use cases
+
+- **Wallet trade history page** — paginated activity feed.
+- **Tax export** — combine with `/positions?status=settled` for full P/L reconstruction.
+- **Backfill in chunks** — page through history with `to=<oldest tid time_us>` shrinking each request.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+# Last 50 fills for a wallet, all markets
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0x14bb...c342aa/trades?limit=50"
+
+# Only fills on outcome 0 in the last hour
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0x14bb...c342aa/trades?outcome_id=0&from=$(date -d '1 hour ago' +%s)000000"
+```
+
+```python Python
+import requests, time
+
+# Pull 24h of one wallet's fills, paginating in 1000-row chunks
+addr = "0x14bb5440db38aa9f4eb3f11f9c12965ea6c342aa"
+since = (int(time.time()) - 86400) * 1_000_000
+all_trades, to = [], None
+while True:
+    params = {"limit": 1000, "from": since}
+    if to: params["to"] = to
+    r = requests.get(f"https://.../api/v1/wallets/{addr}/trades",
+                     headers={"X-API-Key": key}, params=params).json()
+    if not r["trades"]: break
+    all_trades += r["trades"]
+    to = r["trades"][-1]["at"]["us"] - 1
+print(f"Pulled {len(all_trades)} fills")
+```
+</CodeGroup>
+
+## Notes
+
+- Sorted reverse-chronological (newest first).
+- A wallet can appear on BOTH sides of the same trade (self-trade). Those fills show with the same `tid` but different `direction`.
+- HIP-4 fills currently have `tx_hash = 0x000...000` — they settle inside HL state, not on Polygon. The field is preserved for forward compatibility.

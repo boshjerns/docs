@@ -1,0 +1,67 @@
+---
+title: GET /v1/meta
+description: Protocol-level metadata — encoding rules, conventions, indexer scope.
+---
+
+Returns static reference info about HIP-4 itself: how coin names encode outcomes, asset_id formula, side index meanings, min order rules.
+
+## Endpoint
+
+```
+GET /v1/meta
+```
+
+## Why use this
+
+- New integrators land here first — explains the encoding before they dig into market data.
+- Side-index mapping (`0 = Yes`, `1 = No`) is documented programmatically.
+- Tells you the indexer's scope (when our history starts).
+
+## Response
+
+```json
+{
+  "platform": "Hyperliquid HIP-4",
+  "collateral": {
+    "symbol": "USDH",
+    "description": "Hyperliquid prediction-market collateral token. ~1 USDH ≈ 1 USDC."
+  },
+  "encoding": {
+    "coin_format": "#N",
+    "coin_formula": "N = outcome_id * 10 + side_index",
+    "asset_id_formula": "asset_id = 100_000_000 + outcome_id * 10 + side_index",
+    "side_index_meaning": { "0": "Yes", "1": "No" },
+    "example": {
+      "coin": "#0",
+      "outcome_id": 0,
+      "side_index": 0,
+      "side_label": "Yes",
+      "asset_id": 100000000
+    }
+  },
+  "trading": {
+    "min_order_value_usdh": 10,
+    "min_order_rule": "size * min(price, 1 - price) >= $10 USDH"
+  },
+  "outcome_classes": ["priceBinary"],
+  "tif_options": ["Alo", "Gtc", "Ioc", "FrontendMarket"],
+  "indexer": {
+    "source": "live HIP-4 event stream",
+    "approximate_lag_seconds": 5,
+    "history_starts": "2026-05-02T11:00:00Z (HIP-4 mainnet launch)"
+  }
+}
+```
+
+## Notes
+
+This response rarely changes — Cloudflare edges cache it for 1 hour. Safe to call once at app start.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+curl -H "X-API-Key: hip4_live_..." \
+  https://polynode-hip4-explorer.pages.dev/api/v1/meta
+```
+</CodeGroup>

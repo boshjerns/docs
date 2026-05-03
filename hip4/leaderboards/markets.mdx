@@ -1,0 +1,108 @@
+---
+title: GET /v1/leaderboards/markets
+description: Most active HIP-4 markets — by volume, traders, fills, or fees, in 24h or lifetime windows.
+---
+
+Returns markets ranked by activity — pick the window (`24h` or `lifetime`) and the metric (`volume`, `traders`, `fills`, `fees`).
+
+## Endpoint
+
+```
+GET /v1/leaderboards/markets
+```
+
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `window` | string | `"lifetime"` | `lifetime` (all time) or `24h` (rolling 24h) |
+| `by` | string | `"volume"` | One of `volume`, `traders`, `fills`, `fees` |
+| `status` | string | `"all"` | One of `active`, `resolved`, `all` |
+| `limit` | int | 100 | Max rows (cap 500) |
+
+## Response
+
+```json
+{
+  "window": "lifetime",
+  "ranked_by": "volume",
+  "status_filter": "all",
+  "count": 1,
+  "markets": [
+    {
+      "rank": 1,
+      "outcome_id": 0,
+      "title": "BTC >= $78213 by 2026-05-03 06:00 UTC (1d)",
+      "underlying": "BTC",
+      "target_price": "78213",
+      "expiry_str": "20260503-0600",
+      "status": "active",
+      "fills_count": 26732,
+      "unique_traders": 1299,
+      "unique_takers": 1037,
+      "unique_makers": 562,
+      "volume_usdh": "1147289.829980",
+      "volume_shares": "2261326.0",
+      "fees_total": "6.28153367",
+      "builder_fees_total": "6.28153367",
+      "first_trade": { "us": 1777719604322000, "iso": "...", "relative": "7h ago" },
+      "last_trade":  { "us": 1777743859009000, "iso": "...", "relative": "51m ago" }
+    }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `unique_traders` | Distinct wallets that filled either side |
+| `unique_takers` | Distinct takers (crossed the spread) |
+| `unique_makers` | Distinct makers (provided liquidity) |
+| `volume_shares` | Total shares matched (both sides combined) |
+| `fees_total` | Sum of all fees: base + builder + deployer |
+
+## Ranking modes
+
+- `by=volume` — total USDH notional. Default. The "biggest market" view.
+- `by=traders` — distinct trader count. Best signal for "viral" markets even at low ticket size.
+- `by=fills` — count of fills. Activity / churn measure.
+- `by=fees` — total fees paid. The "highest-revenue market" leaderboard.
+
+## Use cases
+
+- **Homepage "trending markets" widget**: `window=24h`, `by=volume`, `status=active`, `limit=20`.
+- **Largest-ever HIP-4 markets**: `window=lifetime`, `by=volume`.
+- **Most-engaged markets**: `by=traders` to surface markets where lots of distinct wallets play, not just one whale.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+# Trending in last 24h
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/markets?window=24h&by=volume&status=active&limit=20"
+
+# All-time biggest by trader count
+curl -H "X-API-Key: hip4_live_..." \
+  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/markets?by=traders&limit=50"
+```
+
+```python Python
+import requests
+r = requests.get(
+  "https://.../api/v1/leaderboards/markets",
+  headers={"X-API-Key": key},
+  params={"window": "24h", "by": "volume", "status": "active", "limit": 10}
+).json()
+for m in r["markets"]:
+    print(f"#{m['rank']:>2} oid={m['outcome_id']:>4}  "
+          f"${m['volume_usdh']:>14}  "
+          f"{m['unique_traders']} traders  "
+          f"{m['title']}")
+```
+</CodeGroup>
+
+## Notes
+
+- The `24h` window is a rolling aggregation, refreshed each minute. Numbers are exact at the moment of the last refresh.
+- `fees_total` and `builder_fees_total` are equal whenever no deployer fee is being charged (current state on HIP-4 mainnet).
+- The maker/taker/trader counts are NOT additive — the same wallet can be a maker on some fills and a taker on others.

@@ -1,0 +1,69 @@
+---
+title: GET /v1/health
+description: System status — indexer lag, active market count.
+---
+
+Returns a snapshot of indexer health and platform status. Use this as a liveness probe before relying on data freshness.
+
+## Endpoint
+
+```
+GET /v1/health
+```
+
+Authentication: required (`X-API-Key`).
+
+## Why use this
+
+- **Liveness check** before running an integration that depends on real-time data.
+- **Lag tracking** — `lag_seconds` is the gap between the latest event we've ingested and wall-clock time. Normally 1–10 seconds.
+- **Status field** — `"ok"` if lag < 60s, `"degraded"` otherwise.
+
+## Response
+
+```json
+{
+  "status": "ok",
+  "lag_seconds": 5,
+  "active_markets": 1,
+  "latest_event": {
+    "us": 1777745247319000,
+    "iso": "2026-05-02T18:07:27.319+00:00",
+    "relative": "3s ago"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `status` | string | `"ok"` if lag < 60s, `"degraded"` otherwise |
+| `lag_seconds` | int | Seconds between latest indexed event and now |
+| `active_markets` | int | Number of HIP-4 outcomes currently active |
+| `latest_event` | object | Timestamp of the most recent fill ingested (`us` epoch microseconds + `iso` + `relative` string) |
+
+## Examples
+
+<CodeGroup>
+```bash curl
+curl -H "X-API-Key: hip4_live_..." \
+  https://polynode-hip4-explorer.pages.dev/api/v1/health
+```
+
+```javascript JavaScript
+const ok = await fetch('https://polynode-hip4-explorer.pages.dev/api/v1/health',
+  { headers: { 'X-API-Key': process.env.HIP4_KEY } }
+).then(r => r.json())
+if (ok.status !== 'ok' || ok.lag_seconds > 30) {
+  console.warn('HIP-4 API stale, deferring queries')
+}
+```
+
+```python Python
+import requests
+r = requests.get(
+  'https://polynode-hip4-explorer.pages.dev/api/v1/health',
+  headers={'X-API-Key': 'hip4_live_...'}
+).json()
+assert r['status'] == 'ok' and r['lag_seconds'] < 30
+```
+</CodeGroup>

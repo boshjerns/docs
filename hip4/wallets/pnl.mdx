@@ -1,0 +1,89 @@
+---
+title: GET /v1/wallets/:addr/pnl
+description: PnL breakdown grouped by market — totals across realized, unrealized, settlement, and fees.
+---
+
+A pre-aggregated view of the wallet's P/L. One row per `outcome_id` the wallet has touched, plus a cross-market `totals` block. Sorted by best-performing market first.
+
+## Endpoint
+
+```
+GET /v1/wallets/:addr/pnl
+```
+
+No query parameters.
+
+## Response
+
+```json
+{
+  "user": "0x14bb5440db38aa9f4eb3f11f9c12965ea6c342aa",
+  "totals": {
+    "realized_pnl": "-1139.4111699999999999999999999",
+    "unrealized_pnl_estimate": "-407.03856000000000000000000250",
+    "settlement_realized_pnl": "0",
+    "fees_paid": "0",
+    "volume_usdh": "68633.712290",
+    "net_pnl_after_fees": "-1139.4111699999999999999999999"
+  },
+  "markets_count": 1,
+  "markets": [
+    {
+      "outcome_id": 0,
+      "title": "BTC >= $78213 by 2026-05-03 06:00 UTC (1d)",
+      "outcome_status": "active",
+      "realized_pnl": "-1139.4111699999999999999999999",
+      "unrealized_pnl_estimate": "-407.03856000000000000000000250",
+      "settlement_realized_pnl": "0",
+      "settlement_payout": "0",
+      "fees_total": "0",
+      "volume_usdh": "68633.712290",
+      "fills_count": 397,
+      "first_trade": { "us": 1777738712050000, "iso": "...", "relative": "2h ago" },
+      "last_trade":  { "us": 1777745780036000, "iso": "...", "relative": "11m ago" }
+    }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `realized_pnl` | Σ of intraday-close PnL per fill (wavg cost basis) |
+| `unrealized_pnl_estimate` | Mark-to-mid: `Σ amount × (current_mid − avg_cost)` over open positions |
+| `settlement_realized_pnl` | PnL booked at resolution: `payout − cost_basis_at_settle` |
+| `settlement_payout` | USDH credited at resolution (winner side gets share count, loser gets 0) |
+| `fees_total` | All fees combined (base + builder + deployer) for this market |
+| `net_pnl_after_fees` | Top-level: `realized_pnl + settlement_realized_pnl − fees_paid` |
+
+## Use cases
+
+- **PnL dashboard** — render summary cards + per-market table in one query.
+- **Tax/audit export** — group by `outcome_status='resolved'` for finalized P/L.
+- **Best/worst markets for a wallet** — markets are pre-sorted by `realized + settlement_realized_pnl DESC`.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+curl -H "X-API-Key: hip4_live_..." \
+  https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0x14bb...c342aa/pnl
+```
+
+```python Python
+import requests
+r = requests.get(f"https://.../api/v1/wallets/{addr}/pnl",
+                 headers={"X-API-Key": key}).json()
+print(f"Net (after fees): ${r['totals']['net_pnl_after_fees']}")
+print(f"Active markets: {r['markets_count']}")
+for m in r['markets'][:5]:
+    print(f"  {m['title'][:50]:50} "
+          f"realized={m['realized_pnl'][:8]} "
+          f"unr={m['unrealized_pnl_estimate'][:8]}")
+```
+</CodeGroup>
+
+## Notes
+
+- For active markets, `unrealized_pnl_estimate` is mark-to-mid using the latest poll snapshot. Mids can be stale or absent for sides with no active maker.
+- `settlement_realized_pnl` is `0` until the market resolves. For the canonical "what did this wallet make on this market" once settled, use `realized_pnl + settlement_realized_pnl`.
+- `net_pnl_after_fees` does NOT subtract unrealized — it's the booked P/L only.

@@ -1,0 +1,112 @@
+---
+title: GET /v1/wallets/:addr/settlements
+description: Clean payout log — every market this wallet held at resolution, with payout and realized PnL.
+---
+
+After a HIP-4 outcome resolves, every wallet that held a non-zero position at the moment of settlement gets a row here. The winning side gets `1 USDH per share`, the losing side gets `0`. This endpoint surfaces those payouts cleanly, without all the trade noise.
+
+## Endpoint
+
+```
+GET /v1/wallets/:addr/settlements
+```
+
+No query parameters — settlements aren't paginated by default; one row per resolved market.
+
+## Response
+
+```json
+{
+  "user": "0xfaa4982c67494d8e778dd970236cf6b3d7a95d46",
+  "count": 2,
+  "totals": {
+    "payout_total_usdh": "2350.0",
+    "realized_pnl": "950.0",
+    "wins": 1,
+    "losses": 1,
+    "win_rate": 0.5
+  },
+  "settlements": [
+    {
+      "outcome_id": 0,
+      "title": "BTC >= $78213 by 2026-05-03 06:00 UTC (1d)",
+      "underlying": "BTC",
+      "target_price": "78213",
+      "expiry_str": "20260503-0600",
+      "settled_at": { "us": 1777788000000000, "iso": "2026-05-03T06:00:00+00:00", "relative": "0s ago" },
+      "held_amount": "1000.0",
+      "avg_cost": "0.65",
+      "winning_side": 0,
+      "held_winning": true,
+      "result": "win",
+      "payout_per_share": "1",
+      "payout_total_usdh": "1000.0",
+      "realized_pnl": "350.0"
+    },
+    {
+      "outcome_id": 1,
+      "title": "ETH >= $3500 by 2026-05-02 12:00 UTC (1h)",
+      "settled_at": { "us": 1777723200000000, "iso": "...", "relative": "1d ago" },
+      "held_amount": "5000.0",
+      "avg_cost": "0.32",
+      "winning_side": 1,
+      "held_winning": false,
+      "result": "loss",
+      "payout_per_share": "0",
+      "payout_total_usdh": "0",
+      "realized_pnl": "-1600.0"
+    }
+  ]
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `held_amount` | Shares the wallet held when the market settled |
+| `avg_cost` | Weighted-average cost basis at settle time (USDH per share) |
+| `winning_side` | The side that resolved YES |
+| `held_winning` | `true` if this wallet's position was on the winning side |
+| `result` | Friendly form: `"win"` or `"loss"` |
+| `payout_per_share` | `1` if `held_winning`, else `0` |
+| `payout_total_usdh` | `held_amount × payout_per_share` |
+| `realized_pnl` | `payout_total - (held_amount × avg_cost)` |
+
+| Totals field | Description |
+|-------|-------------|
+| `payout_total_usdh` | Sum of payouts across all settlements |
+| `realized_pnl` | Sum of `realized_pnl` — net P/L from resolutions only |
+| `wins` / `losses` | Counts of winning vs losing positions |
+| `win_rate` | `wins / (wins + losses)` — null if no settlements yet |
+
+## Use cases
+
+- **Resolution log** for a wallet's profile page — clean, no order/trade noise.
+- **Track-record stats** — `win_rate` and total realized P/L for a leaderboard or rep score.
+- **Tax / accounting** — `payout_total` and `realized_pnl` per resolved market is what you actually need to report.
+
+## Examples
+
+<CodeGroup>
+```bash curl
+curl -H "X-API-Key: hip4_live_..." \
+  https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0xfaa4...5d46/settlements
+```
+
+```python Python
+import requests
+r = requests.get(f"https://.../api/v1/wallets/{addr}/settlements",
+                 headers={"X-API-Key": key}).json()
+print(f"{r['totals']['wins']}W / {r['totals']['losses']}L  "
+      f"({r['totals']['win_rate']:.1%} win rate)" if r['totals']['win_rate'] else "no settlements yet")
+print(f"Net realized: ${r['totals']['realized_pnl']}")
+for s in r["settlements"][:10]:
+    print(f"  {s['result']:>4}  ${s['realized_pnl']:>10}  {s['title']}")
+```
+</CodeGroup>
+
+## Notes
+
+- Returns `count: 0` cleanly when the wallet has no settled positions.
+- `realized_pnl` here is the FINAL P/L of that position (settlement payout minus cost basis). It does NOT match the intraday `realized_pnl` returned by `/v1/wallets/:addr/positions`, which is the intraday-close-only PnL before settlement.
+- A wallet with both a Yes and a No leg open at resolution gets TWO rows — one win, one loss. The total still nets out correctly.
+- Settlements appear here within seconds of the on-chain resolution event.

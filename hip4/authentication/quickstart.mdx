@@ -1,0 +1,74 @@
+---
+title: Authentication
+description: Get an API key + send your first authenticated request.
+---
+
+Every request to the `/v1/*` API surface requires an API key passed in the `X-API-Key` header.
+
+## Key format
+
+```
+hip4_live_<24 hexadecimal characters>
+```
+
+Example: `hip4_live_70fb2abf782395373bf75c5c`
+
+Keys are issued once and shown to you exactly once on creation. We never store the raw key — only a SHA-256 hash. If you lose a key, issue a new one.
+
+## Send your first request
+
+<CodeGroup>
+```bash curl
+curl -H "X-API-Key: hip4_live_..." \
+     https://polynode-hip4-explorer.pages.dev/api/v1/health
+```
+
+```javascript JavaScript
+const r = await fetch('https://polynode-hip4-explorer.pages.dev/api/v1/health', {
+  headers: { 'X-API-Key': 'hip4_live_...' }
+})
+const data = await r.json()
+console.log(data)
+```
+
+```python Python
+import requests
+r = requests.get(
+  'https://polynode-hip4-explorer.pages.dev/api/v1/health',
+  headers={'X-API-Key': 'hip4_live_...'}
+)
+print(r.json())
+```
+</CodeGroup>
+
+You should get a response like:
+
+```json
+{
+  "status": "ok",
+  "lag_seconds": 5,
+  "active_markets": 1,
+  "latest_event": {
+    "us": 1777745247319000,
+    "iso": "2026-05-02T18:07:27.319+00:00",
+    "relative": "3s ago"
+  }
+}
+```
+
+## Common authentication errors
+
+| Status | Body | Meaning |
+|--------|------|---------|
+| 401 | `{"error":"missing X-API-Key header"}` | Forgot the header |
+| 401 | `{"error":"invalid API key format"}` | Doesn't start with `hip4_live_` or wrong length |
+| 401 | `{"error":"invalid or inactive API key"}` | Key never existed or was revoked |
+| 429 | `{"error":"rate limit exceeded for tier 'free' (600 req/min)"}` | You hit your tier's per-key limit |
+| 503 | `{"error":"global rate limit exceeded — try again momentarily"}` | Aggregate cap; retry in ~1s |
+
+## Security notes
+
+- Keys travel over HTTPS only.
+- Keys are scoped per customer — bursts on one customer's key don't affect others.
+- Treat your key like a password. Don't commit to git, don't expose in client-side JS for production apps. Use a backend proxy.
+- For browser-side prototypes a free-tier key in client JS is fine — the worst case is your key gets rate-limited at 10/sec, not stolen value.
