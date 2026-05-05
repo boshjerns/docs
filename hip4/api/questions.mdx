@@ -1,41 +1,66 @@
 ---
 title: GET /v1/questions
-description: List multi-outcome question groupings.
+description: List multi-outcome question groupings (pending upstream).
 ---
 
-HIP-4 supports both binary outcomes (Yes/No) and multi-outcome **questions** that wrap N related outcomes (e.g. "Who wins NFL MVP" with one outcome per candidate). This endpoint returns the question metadata.
+<Note>
+**Feature status: `pending_upstream`.** Hyperliquid does not currently emit question metadata on-chain. Until HL ships question records the index has nothing to populate this endpoint with. The route is wired and stable — it will start returning data automatically once HL emits it. No client changes will be needed.
+</Note>
+
+HIP-4 outcomes can in principle be grouped into multi-outcome **questions** (e.g. "Who wins NFL MVP" with one outcome per candidate). This endpoint will surface that grouping when it exists. For now use `/v1/markets` to enumerate individual outcomes.
 
 ## Endpoint
 
 ```
 GET /v1/questions
+GET /v1/questions/:qid
 ```
 
-## Response
+## Response (current — feature pending)
 
 ```json
 {
   "count": 0,
-  "questions": []
+  "questions": [],
+  "note": "HIP-4 question metadata (parent grouping linking related outcomes) is not yet emitted on-chain by Hyperliquid. This endpoint will populate automatically once HL ships question records. Use /v1/markets to enumerate individual outcomes in the meantime.",
+  "feature_status": "pending_upstream"
 }
 ```
 
-When questions exist, each entry returns:
+## Response (future — when HL ships questions)
 
 ```json
 {
-  "question_id": 1,
-  "name": "...",
-  "description": "...",
-  "outcome_ids": [10, 11, 12],
-  "outcome_count": 3,
-  "fallback_outcome": null,
-  "deployed_at": { "us": 1777..., "iso": "...", "relative": "..." }
+  "count": 1,
+  "questions": [
+    {
+      "question_id": 7,
+      "name": "SuperBowl2027",
+      "description": "Which team wins Super Bowl LXI",
+      "outcome_ids": [10, 11, 12, 13],
+      "outcome_count": 4,
+      "fallback_outcome": null,
+      "deployed_at": { "us": 1777..., "iso": "...", "relative": "..." }
+    }
+  ]
 }
 ```
 
-## Notes
+## /v1/questions/:qid
 
-As of this writing, no multi-outcome questions are deployed on HIP-4 mainnet. The endpoint is ready for when they appear. We recommend polling weekly until activity is observed; mid-day polling once questions exist.
+Returns one question's metadata. Until HL emits questions this returns:
 
-For aggregating data across the outcomes belonging to one question (sum-of-probabilities, top holders across the whole event), see the upcoming `/v1/questions/:qid/aggregate` endpoint.
+```
+HTTP 404
+{
+  "error": "question N not found",
+  "note": "HIP-4 question metadata is not yet emitted on-chain by Hyperliquid. No questions exist in this index yet. Endpoint will work automatically once HL ships question records.",
+  "feature_status": "pending_upstream"
+}
+```
+
+## How to know when this goes live
+
+Poll `/v1/questions` (cheap — single Postgres scan against an empty table). When `count > 0`, HL has shipped questions and the data is live. The `feature_status` and `note` fields will disappear from the response once data exists.
+
+For aggregating data across the outcomes belonging to one question (sum-of-probabilities, top holders across the whole event), see [`/v1/questions/:qid/aggregate`](/questions/aggregate).

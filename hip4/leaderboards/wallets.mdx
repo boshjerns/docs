@@ -68,11 +68,11 @@ GET /v1/leaderboards/wallets
 ```bash curl
 # Top 50 by volume
 curl -H "X-API-Key: hip4_live_..." \
-  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/wallets?limit=50"
+  "https://hip4.polynode.dev/api/v1/leaderboards/wallets?limit=50"
 
 # Top 20 winners (net of fees), min 10 fills
 curl -H "X-API-Key: hip4_live_..." \
-  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/wallets?by=net_pnl&limit=20&min_fills=10"
+  "https://hip4.polynode.dev/api/v1/leaderboards/wallets?by=net_pnl&limit=20&min_fills=10"
 ```
 
 ```python Python

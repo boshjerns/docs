@@ -11,7 +11,13 @@ Returns the wallet's open-orders snapshot — orders that are placed and resting
 GET /v1/wallets/:addr/orders
 ```
 
-No query parameters.
+## Query parameters
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `outcome_id` | int | — | Restrict to a single market |
+| `side` | int | both | Filter to side 0 (Yes) or 1 (No) |
+| `limit` | int | 100 | Max rows (cap 1000) |
 
 ## Response
 
@@ -19,6 +25,7 @@ No query parameters.
 {
   "user": "0x6abc111bd22bb38e649f81be60dfbeb35648aac6",
   "count": 9,
+  "limit": 100,
   "orders": [
     {
       "oid": 407574079390,
@@ -65,8 +72,13 @@ No query parameters.
 
 <CodeGroup>
 ```bash curl
+# All open orders (newest first, default limit=100)
 curl -H "X-API-Key: hip4_live_..." \
-  https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0x6abc...aac6/orders
+  https://hip4.polynode.dev/api/v1/wallets/0x6abc...aac6/orders
+
+# Filter to a single market, sell-side only
+curl -H "X-API-Key: hip4_live_..." \
+  "https://hip4.polynode.dev/api/v1/wallets/0x6abc...aac6/orders?outcome_id=2&side=1&limit=20"
 ```
 
 ```javascript JavaScript

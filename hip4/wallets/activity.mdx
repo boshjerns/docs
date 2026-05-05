@@ -106,11 +106,11 @@ GET /v1/wallets/:addr/activity
 ```bash curl
 # Last 100 events of any kind
 curl -H "X-API-Key: hip4_live_..." \
-  "https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0xfaa4...5d46/activity?limit=100"
+  "https://hip4.polynode.dev/api/v1/wallets/0xfaa4...5d46/activity?limit=100"
 
 # Only trades + settlements (clean P/L view)
 curl -H "X-API-Key: hip4_live_..." \
-  "https://polynode-hip4-explorer.pages.dev/api/v1/wallets/0xfaa4...5d46/activity?kinds=trade,settlement"
+  "https://hip4.polynode.dev/api/v1/wallets/0xfaa4...5d46/activity?kinds=trade,settlement"
 ```
 
 ```python Python

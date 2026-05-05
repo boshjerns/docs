@@ -84,11 +84,11 @@ GET /v1/markets/:id/candles
 ```bash curl
 # Last 24 5-minute bars for outcome 0 Yes side
 curl -H "X-API-Key: hip4_live_..." \
-  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/candles?period=5m&limit=24"
+  "https://hip4.polynode.dev/api/v1/markets/0/candles?period=5m&limit=24"
 
 # 1-hour bars from a specific date
 curl -H "X-API-Key: hip4_live_..." \
-  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/candles?period=1h&from=1777680000000000"
+  "https://hip4.polynode.dev/api/v1/markets/0/candles?period=1h&from=1777680000000000"
 ```
 
 ```python Python

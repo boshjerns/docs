@@ -3,6 +3,10 @@ title: GET /v1/leaderboards/deployers
 description: Per-outcome deployer revenue — revenue earned by whoever deployed each market.
 ---
 
+<Note>
+**Feature status: `pending_upstream`.** Hyperliquid's HIP-4 deployer fee rate is currently 0 across every market — no deployer is earning anything on-chain yet. This endpoint is wired and will populate automatically the moment HL deployers start charging. Builder fees (a separate mechanism) ARE active and ranked at [`/v1/leaderboards/builders`](/leaderboards/builders).
+</Note>
+
 Each HIP-4 outcome has a deployer who can charge a fee on every fill (think Polymarket's market creator royalty). This endpoint ranks outcomes by how much their deployer has earned.
 
 ## Endpoint
@@ -18,7 +22,19 @@ GET /v1/leaderboards/deployers
 | `by` | string | `"revenue"` | One of `revenue`, `volume`, `bps` |
 | `limit` | int | 100 | Max rows (cap 500) |
 
-## Response
+## Response (current — feature pending)
+
+```json
+{
+  "ranked_by": "revenue",
+  "count": 0,
+  "deployers": [],
+  "note": "HIP-4 deployer fee rate is currently 0 across all markets — Hyperliquid has not activated deployer revenue on-chain yet. This endpoint will populate automatically once HL deployers start earning fees. Builder fees (separate mechanism) are tracked at /v1/leaderboards/builders.",
+  "feature_status": "pending_upstream"
+}
+```
+
+## Response (future — when HL activates deployer fees)
 
 ```json
 {
@@ -34,14 +50,14 @@ GET /v1/leaderboards/deployers
       "target_price": "78213",
       "fills_count": 26732,
       "volume_usdh": "1147289.829980",
-      "deployer_fees_total_usdh": "0",
-      "effective_bps": "0",
+      "deployer_fees_total_usdh": "147.32",
+      "effective_bps": "1.28",
       "distinct_fee_tokens": 1,
       "first_trade": { "us": 1777719604322000, "iso": "...", "relative": "7h ago" },
       "last_trade":  { "us": 1777743859009000, "iso": "...", "relative": "51m ago" }
     }
   ],
-  "note": "Deployer revenue is attributed per-outcome (the deployer of THAT outcome). Cross-outcome deployer aggregation is on the roadmap."
+  "feature_status": "live"
 }
 ```
 
@@ -68,11 +84,11 @@ GET /v1/leaderboards/deployers
 <CodeGroup>
 ```bash curl
 curl -H "X-API-Key: hip4_live_..." \
-  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/deployers?limit=50"
+  "https://hip4.polynode.dev/api/v1/leaderboards/deployers?limit=50"
 
 # Highest effective rate
 curl -H "X-API-Key: hip4_live_..." \
-  "https://polynode-hip4-explorer.pages.dev/api/v1/leaderboards/deployers?by=bps&limit=10"
+  "https://hip4.polynode.dev/api/v1/leaderboards/deployers?by=bps&limit=10"
 ```
 
 ```python Python
@@ -89,6 +105,10 @@ for d in r["deployers"][:10]:
 
 ## Notes
 
-- Empty result when no HIP-4 outcomes have charged a deployer fee yet (current state — HIP-4 mainnet is hours old at writing).
-- `distinct_fee_tokens > 1` means the deployer has been collecting fees in different tokens across fills (e.g. some in USDH, some in share-side tokens).
+- Currently empty across the board — see callout at top. Builder fees (active) are tracked at `/v1/leaderboards/builders`.
+- `distinct_fee_tokens > 1` will mean the deployer has been collecting fees in different tokens across fills (e.g. some in USDH, some in share-side tokens).
 - The deployer-of-an-outcome address is not exposed in current state — this endpoint groups by `outcome_id`, not by deployer address. Cross-outcome aggregation will arrive in a future schema update.
+
+## How to know when this goes live
+
+When `count > 0` and `feature_status: "live"` appears in the response, HL has activated deployer fees and revenue is flowing. The route shape is stable — no client changes needed.

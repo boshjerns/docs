@@ -3,6 +3,10 @@ title: GET /v1/questions/:qid/aggregate
 description: Cross-outcome math for a multi-outcome question — implied probabilities, favorite, total volume.
 ---
 
+<Note>
+**Feature status: `pending_upstream`.** Hyperliquid does not currently emit question metadata on-chain. The route is wired and stable but every call returns 404 until HL ships question records. See [`/v1/questions`](/api/questions) for the broader explanation.
+</Note>
+
 A "question" on HIP-4 is a group of related outcomes (e.g. "Which team wins the Super Bowl?" with 32 child outcomes, one per team). Each outcome trades independently as its own Yes/No binary, but you usually want them aggregated. This endpoint does that math.
 
 ## Endpoint
@@ -81,7 +85,7 @@ The `:qid` is the integer `question_id` from `/v1/questions`.
 <CodeGroup>
 ```bash curl
 curl -H "X-API-Key: hip4_live_..." \
-  https://polynode-hip4-explorer.pages.dev/api/v1/questions/7/aggregate
+  https://hip4.polynode.dev/api/v1/questions/7/aggregate
 ```
 
 ```python Python
@@ -102,10 +106,14 @@ for o in sorted_outcomes[:5]:
 
 ```
 HTTP 404
-{"error": "question 7 not found"}
+{
+  "error": "question 7 not found",
+  "note": "HIP-4 question metadata is not yet emitted on-chain by Hyperliquid. No questions exist in this index yet. Endpoint will work automatically once HL ships question records.",
+  "feature_status": "pending_upstream"
+}
 ```
 
-Returned if the question doesn't exist. (No multi-outcome questions exist on HIP-4 mainnet at the moment of writing — the endpoint is ready and will populate as soon as one is deployed.)
+Returned if the question doesn't exist. Currently every call returns 404 because HL has not yet emitted any question records on-chain — see the callout at the top of this page.
 
 ## Notes
 

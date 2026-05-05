@@ -89,15 +89,15 @@ If both `from` and `limit` are omitted, you get the **last `limit × step` worth
 ```bash curl
 # Last hour, 1-minute bars (60 points)
 curl -H "X-API-Key: hip4_live_..." \
-  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/depth-history?step=1m&limit=60"
+  "https://hip4.polynode.dev/api/v1/markets/0/depth-history?step=1m&limit=60"
 
 # Last 4 hours, 5m, Yes side only
 curl -H "X-API-Key: hip4_live_..." \
-  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/depth-history?step=5m&limit=48&side=0"
+  "https://hip4.polynode.dev/api/v1/markets/0/depth-history?step=5m&limit=48&side=0"
 
 # Specific window, 15m bars
 curl -H "X-API-Key: hip4_live_..." \
-  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/depth-history?from=1777732000000000&to=1777750000000000&step=15m"
+  "https://hip4.polynode.dev/api/v1/markets/0/depth-history?from=1777732000000000&to=1777750000000000&step=15m"
 ```
 
 ```python Python

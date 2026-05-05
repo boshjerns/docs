@@ -67,12 +67,12 @@ GET /v1/markets/:id/book
 <CodeGroup>
 ```bash curl
 curl -H "X-API-Key: hip4_live_..." \
-  "https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/book?levels=10"
+  "https://hip4.polynode.dev/api/v1/markets/0/book?levels=10"
 ```
 
 ```javascript JavaScript
 const r = await fetch(
-  'https://polynode-hip4-explorer.pages.dev/api/v1/markets/0/book?side=0&levels=20',
+  'https://hip4.polynode.dev/api/v1/markets/0/book?side=0&levels=20',
   { headers: { 'X-API-Key': key } }
 ).then(r => r.json())
 
